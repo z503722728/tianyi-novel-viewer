@@ -1,386 +1,332 @@
 /**
- * 天意阅读器 · 翻页阅读模块 v1
+ * 天意阅读器 · 翻页阅读模块 v2
  *
- * 工作原理：
- * 1. 把章节 HTML 渲染到隐藏的等高测量容器里
- * 2. 按屏幕可用高度自动切页（二分查找最大安全高度）
- * 3. 切换页用 CSS transform 滑动动画
- * 4. 支持：左右滑动手势 / 点击左右半屏 / 键盘方向键
- * 5. 顶部细进度条 + 页码提示
+ * 修复：
+ * 1. 分页高度双重扣除问题 → 用 CSS column 原生分页，彻底告别手动测量误差
+ * 2. 末页点击下一章 / 首页点击上一章 → 触发 window._showChapterByIndex
+ *
+ * 原理（CSS Columns 分页）：
+ *   把整章内容渲染到 column-width=100vw、column-gap=0 的多列容器
+ *   用 scrollLeft 步进 viewport 宽度实现翻页
+ *   CSS 负责文字分页，不需要手动测量，精确无裂缝
  */
 
 window.PagedReader = (() => {
   'use strict';
 
-  // ===== 常量 =====
-  const PADDING_H   = 20;   // 左右内边距 px
-  const PADDING_TOP = 12;   // 顶部内边距 px
-  const PADDING_BOT = 56;   // 底部内边距 px（留给页码）
-  const ANIM_MS     = 280;  // 翻页动画时长
-  const FONT_SIZE   = 17;   // 正文字号 px
-  const LINE_HEIGHT = 1.85; // 行高
+  const ANIM_MS  = 260;
 
   // ===== 状态 =====
-  let pages       = [];   // 每页 HTML 字符串
+  let totalPages  = 1;
   let curPage     = 0;
   let isAnimating = false;
-  let chapterInfo = null; // { title, meta }
+  let chapterTitle = '';
 
-  // ===== DOM 引用（懒创建）=====
-  let _overlay  = null;   // 全屏阅读层
-  let _pageEl   = null;   // 当前页 div
-  let _nextEl   = null;   // 备用页 div（动画用）
-  let _progress = null;   // 顶部进度条
-  let _counter  = null;   // 页码
+  // ===== DOM =====
+  let _overlay   = null;
+  let _strip     = null;   // 横向滚动条（columns 容器）
+  let _counter   = null;
+  let _titleEl   = null;
 
-  // ===== 手势状态 =====
-  let _txStart = 0, _tyStart = 0, _txTime = 0;
-  let _dragging = false;
+  // ===== 手势 =====
+  let _txStart = 0, _tyStart = 0, _txTime = 0, _dragging = false;
 
   // ===========================
-  // 1. 构建全屏 DOM
+  // 构建 DOM（懒，只建一次）
   // ===========================
   function buildDOM() {
     if (_overlay) return;
 
     _overlay = document.createElement('div');
     _overlay.id = 'paged-reader';
-    _overlay.style.cssText = [
-      'position:fixed', 'inset:0', 'z-index:500',
-      'background:var(--bg,#0f0f1a)',
-      'display:flex', 'flex-direction:column',
-      'overflow:hidden',
-      'touch-action:none',
-    ].join(';');
+    Object.assign(_overlay.style, {
+      position: 'fixed', inset: '0', zIndex: '500',
+      background: 'var(--bg,#0f0f1a)',
+      display: 'flex', flexDirection: 'column',
+      overflow: 'hidden',
+    });
 
-    // 顶部栏
+    // ── 顶部栏 ──
     const bar = document.createElement('div');
-    bar.style.cssText = [
-      'display:flex', 'align-items:center', 'justify-content:space-between',
-      'padding:0 16px', 'height:48px', 'flex-shrink:0',
-      'border-bottom:1px solid rgba(255,255,255,.06)',
-    ].join(';');
+    Object.assign(bar.style, {
+      display: 'flex', alignItems: 'center',
+      padding: '0 16px', height: '48px', flexShrink: '0',
+      borderBottom: '1px solid rgba(255,255,255,.07)',
+    });
 
-    const titleEl = document.createElement('div');
-    titleEl.id = 'pr-title';
-    titleEl.style.cssText = 'font-size:14px;color:rgba(255,255,255,.55);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap';
+    _titleEl = document.createElement('div');
+    Object.assign(_titleEl.style, {
+      flex: '1', fontSize: '14px', color: 'rgba(255,255,255,.5)',
+      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    });
+
+    _counter = document.createElement('div');
+    Object.assign(_counter.style, {
+      fontSize: '12px', color: 'rgba(255,255,255,.3)',
+      marginLeft: '12px', flexShrink: '0',
+    });
 
     const closeBtn = document.createElement('button');
     closeBtn.textContent = '✕';
-    closeBtn.style.cssText = [
-      'background:none', 'border:none', 'color:rgba(255,255,255,.5)',
-      'font-size:18px', 'cursor:pointer', 'padding:8px',
-      'line-height:1', 'flex-shrink:0',
-    ].join(';');
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: 'rgba(255,255,255,.4)',
+      fontSize: '18px', cursor: 'pointer', padding: '8px 0 8px 16px',
+      lineHeight: '1', flexShrink: '0',
+    });
     closeBtn.onclick = close;
 
-    bar.appendChild(titleEl);
+    bar.appendChild(_titleEl);
+    bar.appendChild(_counter);
     bar.appendChild(closeBtn);
 
-    // 进度条
-    _progress = document.createElement('div');
-    _progress.style.cssText = [
-      'height:2px', 'background:rgba(124,92,252,.25)', 'flex-shrink:0',
-    ].join(';');
-    const _progressFill = document.createElement('div');
-    _progressFill.id = 'pr-prog-fill';
-    _progressFill.style.cssText = [
-      'height:100%', 'background:var(--accent,#7c5cfc)',
-      'transition:width .3s', 'width:0%',
-    ].join(';');
-    _progress.appendChild(_progressFill);
+    // ── 进度条 ──
+    const progWrap = document.createElement('div');
+    Object.assign(progWrap.style, {
+      height: '2px', background: 'rgba(124,92,252,.2)', flexShrink: '0',
+    });
+    const progFill = document.createElement('div');
+    progFill.id = 'pr-fill';
+    Object.assign(progFill.style, {
+      height: '100%', background: 'var(--accent,#7c5cfc)',
+      width: '0%', transition: 'width .3s',
+    });
+    progWrap.appendChild(progFill);
 
-    // 翻页区域
+    // ── 翻页 viewport（overflow hidden，内部用 strip 滑动）──
     const viewport = document.createElement('div');
-    viewport.id = 'pr-viewport';
-    viewport.style.cssText = [
-      'flex:1', 'position:relative', 'overflow:hidden',
-    ].join(';');
+    Object.assign(viewport.style, {
+      flex: '1', position: 'relative', overflow: 'hidden',
+    });
 
-    _pageEl = makePageDiv('pr-cur');
-    _nextEl = makePageDiv('pr-next');
-    _nextEl.style.transform = 'translateX(100%)';
+    // strip：CSS multi-column 容器，宽度 = 页数 × 100%
+    _strip = document.createElement('div');
+    _strip.id = 'pr-strip';
+    Object.assign(_strip.style, {
+      position: 'absolute', top: '0', left: '0', bottom: '0',
+      // 宽度和 column-width 在 open() 时设置
+      columnGap: '0px',
+      padding: '16px 20px 36px',
+      fontSize: '17px',
+      lineHeight: '1.9',
+      color: 'rgba(255,255,255,.88)',
+      wordBreak: 'break-all',
+      boxSizing: 'border-box',
+      willChange: 'transform',
+      transition: `transform ${ANIM_MS}ms cubic-bezier(.4,0,.2,1)`,
+    });
 
-    viewport.appendChild(_pageEl);
-    viewport.appendChild(_nextEl);
+    viewport.appendChild(_strip);
 
-    // 页码
-    _counter = document.createElement('div');
-    _counter.id = 'pr-counter';
-    _counter.style.cssText = [
-      'position:absolute', 'bottom:10px', 'left:0', 'right:0',
-      'text-align:center', 'font-size:12px',
-      'color:rgba(255,255,255,.25)', 'pointer-events:none',
-    ].join(';');
-    viewport.appendChild(_counter);
+    // 左右点击区（透明，不遮文字选中，只响应 tap）
+    const tapLeft  = makeTapZone('left',  '35%');
+    const tapRight = makeTapZone('right', '35%');
+    tapLeft.onclick  = () => prevPage();
+    tapRight.onclick = () => nextPage();
+    viewport.appendChild(tapLeft);
+    viewport.appendChild(tapRight);
 
     _overlay.appendChild(bar);
-    _overlay.appendChild(_progress);
+    _overlay.appendChild(progWrap);
     _overlay.appendChild(viewport);
     document.body.appendChild(_overlay);
 
     // 手势
     bindGestures(viewport);
-    // 键盘
     document.addEventListener('keydown', onKey);
   }
 
-  function makePageDiv(id) {
-    const d = document.createElement('div');
-    d.id = id;
-    d.style.cssText = [
-      'position:absolute', 'inset:0',
-      `padding:${PADDING_TOP}px ${PADDING_H}px ${PADDING_BOT}px`,
-      'overflow:hidden',
-      `font-size:${FONT_SIZE}px`,
-      `line-height:${LINE_HEIGHT}`,
-      'color:rgba(255,255,255,.88)',
-      'transition:transform ' + ANIM_MS + 'ms cubic-bezier(.4,0,.2,1)',
-    ].join(';');
-    return d;
+  function makeTapZone(side, width) {
+    const z = document.createElement('div');
+    Object.assign(z.style, {
+      position: 'absolute', top: '0', bottom: '0',
+      [side]: '0', width,
+      zIndex: '10', cursor: 'pointer',
+    });
+    return z;
   }
 
   // ===========================
-  // 2. 分页算法
+  // 分页：用 CSS columns 原生分页
   // ===========================
-  function splitPages(html) {
-    // 用隐藏 iframe 测量，避免影响主页面布局
-    const measure = document.createElement('div');
-    measure.style.cssText = [
-      'position:fixed', 'left:-9999px', 'top:0',
-      'width:' + (window.innerWidth - PADDING_H * 2) + 'px',
-      `font-size:${FONT_SIZE}px`,
-      `line-height:${LINE_HEIGHT}`,
-      'visibility:hidden', 'overflow:hidden',
-      'word-break:break-all',
-    ].join(';');
-    measure.innerHTML = html;
-    document.body.appendChild(measure);
+  function calcPages(html) {
+    const vw = window.innerWidth;
+    const vh = window.innerHeight - 48 - 2; // 减去顶栏和进度条
 
-    // 可用高度
-    const availH = window.innerHeight - 48 - 2 - PADDING_TOP - PADDING_BOT;
+    // 设置 strip 的 column 属性
+    _strip.style.width          = vw + 'px';       // 先设为单列宽，让浏览器计算自然高度
+    _strip.style.columnWidth    = vw + 'px';
+    _strip.style.columnCount    = 'auto';
+    _strip.innerHTML            = html;
+    _overlay.style.display      = 'flex';           // 必须可见才能测量
+    _strip.style.height         = vh + 'px';
 
-    // 把所有段落/h1/h2/h3/blockquote 节点拿出来逐个装
-    const nodes = Array.from(measure.childNodes);
-    const result = [];
-    let bucket = [];
-    let bucketH = 0;
+    // 强制回流，获取实际列数
+    const scrollW = _strip.scrollWidth;
+    const pages   = Math.max(1, Math.round(scrollW / vw));
 
-    for (const node of nodes) {
-      if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim()) continue;
+    // 设置真实宽度（总列数 × vw）
+    _strip.style.width = (pages * vw) + 'px';
 
-      // 测量这个节点高度
-      const tmp = document.createElement('div');
-      tmp.style.cssText = measure.style.cssText.replace('left:-9999px','left:-99999px');
-      tmp.appendChild(node.cloneNode(true));
-      document.body.appendChild(tmp);
-      const nodeH = tmp.scrollHeight + 8; // +8 margin
-      document.body.removeChild(tmp);
+    return pages;
+  }
 
-      if (bucketH + nodeH > availH && bucket.length > 0) {
-        // 当前桶已满，存一页
-        result.push(bucket.join(''));
-        bucket = [];
-        bucketH = 0;
-      }
+  // ===========================
+  // 渲染 / 翻页
+  // ===========================
+  function goTo(idx, animate) {
+    if (isAnimating && animate) return;
+    idx = Math.max(0, Math.min(idx, totalPages - 1));
 
-      // 如果单个节点超过一页（超长段落），强制切字
-      if (nodeH > availH) {
-        const chunks = splitLongNode(node, availH, measure.style.cssText);
-        chunks.forEach((chunk, i) => {
-          if (i === 0 && bucket.length > 0) {
-            bucket.push(chunk);
-            result.push(bucket.join(''));
-            bucket = []; bucketH = 0;
-          } else if (i === chunks.length - 1) {
-            bucket.push(chunk);
-            bucketH = availH * 0.5; // 估算
-          } else {
-            result.push(chunk);
-          }
-        });
-      } else {
-        bucket.push(node.outerHTML || node.textContent);
-        bucketH += nodeH;
-      }
+    if (animate && idx !== curPage) {
+      isAnimating = true;
+      _strip.style.transition = `transform ${ANIM_MS}ms cubic-bezier(.4,0,.2,1)`;
+      _strip.style.transform  = `translateX(${-idx * window.innerWidth}px)`;
+      setTimeout(() => { isAnimating = false; }, ANIM_MS);
+    } else {
+      _strip.style.transition = 'none';
+      _strip.style.transform  = `translateX(${-idx * window.innerWidth}px)`;
     }
-    if (bucket.length > 0) result.push(bucket.join(''));
 
-    document.body.removeChild(measure);
-    return result.length > 0 ? result : [html];
-  }
-
-  function splitLongNode(node, availH, baseStyle) {
-    // 对超长 <p> 按字数二分切片
-    const text = node.textContent || '';
-    const tag  = node.tagName?.toLowerCase() || 'p';
-    const chunks = [];
-    let start = 0;
-    const total = text.length;
-
-    while (start < total) {
-      // 二分查找最大安全长度
-      let lo = 1, hi = Math.min(total - start, 600), safe = lo;
-      while (lo <= hi) {
-        const mid = (lo + hi) >> 1;
-        const tmp = document.createElement('div');
-        tmp.style.cssText = baseStyle.replace('left:-9999px','left:-99999px');
-        tmp.innerHTML = `<${tag}>${escHtmlSimple(text.slice(start, start + mid))}</${tag}>`;
-        document.body.appendChild(tmp);
-        const h = tmp.scrollHeight;
-        document.body.removeChild(tmp);
-        if (h <= availH) { safe = mid; lo = mid + 1; }
-        else { hi = mid - 1; }
-      }
-      chunks.push(`<${tag}>${escHtmlSimple(text.slice(start, start + safe))}</${tag}>`);
-      start += safe;
-    }
-    return chunks;
-  }
-
-  function escHtmlSimple(s) {
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  // ===========================
-  // 3. 渲染与翻页
-  // ===========================
-  function render(idx) {
-    curPage = Math.max(0, Math.min(idx, pages.length - 1));
-    _pageEl.innerHTML = pages[curPage];
+    curPage = idx;
     updateUI();
   }
 
   function updateUI() {
-    const fill = document.getElementById('pr-prog-fill');
-    if (fill) fill.style.width = ((curPage + 1) / pages.length * 100) + '%';
-    if (_counter) _counter.textContent = `${curPage + 1} / ${pages.length}`;
+    if (_counter) _counter.textContent = `${curPage + 1} / ${totalPages}`;
+    const fill = document.getElementById('pr-fill');
+    if (fill) fill.style.width = ((curPage + 1) / totalPages * 100) + '%';
   }
 
-  function goTo(idx, fromRight /* true=从右滑入, false=从左滑入 */) {
-    if (isAnimating) return;
-    idx = Math.max(0, Math.min(idx, pages.length - 1));
-    if (idx === curPage) return;
-
-    isAnimating = true;
-    const dir = fromRight ? 1 : -1;
-
-    // 准备 next 页
-    _nextEl.innerHTML = pages[idx];
-    _nextEl.style.transition = 'none';
-    _nextEl.style.transform  = `translateX(${dir * 100}%)`;
-
-    // 强制重排
-    _nextEl.offsetHeight; // eslint-disable-line
-
-    // 同步动画
-    _nextEl.style.transition = `transform ${ANIM_MS}ms cubic-bezier(.4,0,.2,1)`;
-    _pageEl.style.transition = `transform ${ANIM_MS}ms cubic-bezier(.4,0,.2,1)`;
-    _nextEl.style.transform  = 'translateX(0)';
-    _pageEl.style.transform  = `translateX(${-dir * 100}%)`;
-
-    setTimeout(() => {
-      // 交换
-      _pageEl.style.transition = 'none';
-      _pageEl.style.transform  = 'translateX(0)';
-      _pageEl.innerHTML        = pages[idx];
-      _nextEl.style.transition = 'none';
-      _nextEl.style.transform  = `translateX(${dir * 100}%)`;
-      _nextEl.innerHTML        = '';
-
-      curPage     = idx;
-      isAnimating = false;
-      updateUI();
-    }, ANIM_MS);
-  }
-
+  // ── 翻页（返回 true=翻成功，false=已到边界触发章节跳转）──
   function nextPage() {
-    if (curPage < pages.length - 1) { goTo(curPage + 1, true); return true; }
-    return false; // 已到末页
+    if (curPage < totalPages - 1) {
+      goTo(curPage + 1, true);
+      return;
+    }
+    // 末页 → 下一章
+    const idx = window._getCurrentChapterIndex ? window._getCurrentChapterIndex() : -1;
+    const chaps = window._currentBook?.chapters || [];
+    if (idx >= 0 && idx < chaps.length - 1) {
+      flashEdge('right', '下一章');
+      setTimeout(() => {
+        if (window._showChapterByIndex) window._showChapterByIndex(idx + 1);
+      }, 180);
+    } else {
+      flashEdge('right', '已是最新章');
+    }
   }
+
   function prevPage() {
-    if (curPage > 0) { goTo(curPage - 1, false); return true; }
-    return false; // 已到首页
+    if (curPage > 0) {
+      goTo(curPage - 1, true);
+      return;
+    }
+    // 首页 → 上一章
+    const idx = window._getCurrentChapterIndex ? window._getCurrentChapterIndex() : -1;
+    const chaps = window._currentBook?.chapters || [];
+    if (idx > 0) {
+      flashEdge('left', '上一章');
+      setTimeout(() => {
+        if (window._showChapterByIndex) window._showChapterByIndex(idx - 1);
+      }, 180);
+    } else {
+      flashEdge('left', '已是第一章');
+    }
+  }
+
+  // 边缘提示闪烁
+  function flashEdge(side, text) {
+    let el = document.getElementById('pr-edge-hint');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'pr-edge-hint';
+      Object.assign(el.style, {
+        position: 'fixed', top: '50%', transform: 'translateY(-50%)',
+        background: 'rgba(124,92,252,.75)', color: '#fff',
+        fontSize: '13px', padding: '8px 14px', borderRadius: '8px',
+        zIndex: '600', pointerEvents: 'none', opacity: '0',
+        transition: 'opacity .2s',
+      });
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+    el.style[side === 'right' ? 'right' : 'left'] = '16px';
+    el.style[side === 'right' ? 'left' : 'right'] = '';
+    el.style.opacity = '1';
+    clearTimeout(el._t);
+    el._t = setTimeout(() => { el.style.opacity = '0'; }, 800);
+    if (navigator.vibrate) navigator.vibrate(side === 'right' && text !== '已是最新章' ? 20 : [10, 30, 10]);
   }
 
   // ===========================
-  // 4. 手势绑定
+  // 手势
   // ===========================
   function bindGestures(el) {
-    el.addEventListener('touchstart', (e) => {
-      _txStart  = e.touches[0].clientX;
-      _tyStart  = e.touches[0].clientY;
-      _txTime   = Date.now();
+    el.addEventListener('touchstart', e => {
+      _txStart = e.touches[0].clientX;
+      _tyStart = e.touches[0].clientY;
+      _txTime  = Date.now();
       _dragging = false;
     }, { passive: true });
 
-    el.addEventListener('touchmove', (e) => {
-      const dx = e.touches[0].clientX - _txStart;
-      const dy = e.touches[0].clientY - _tyStart;
-      if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > 8) _dragging = true;
+    el.addEventListener('touchmove', e => {
+      const dx = Math.abs(e.touches[0].clientX - _txStart);
+      const dy = Math.abs(e.touches[0].clientY - _tyStart);
+      if (dx > dy * 1.2 && dx > 8) _dragging = true;
     }, { passive: true });
 
-    el.addEventListener('touchend', (e) => {
-      const dx  = e.changedTouches[0].clientX - _txStart;
-      const dy  = e.changedTouches[0].clientY - _tyStart;
-      const dt  = Date.now() - _txTime;
-      const absDx = Math.abs(dx), absDy = Math.abs(dy);
+    el.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - _txStart;
+      const dy = e.changedTouches[0].clientY - _tyStart;
+      const dt = Date.now() - _txTime;
 
-      // 快速 tap（不是拖动）
-      if (!_dragging && absDx < 12 && absDy < 12 && dt < 300) {
-        const ratio = e.changedTouches[0].clientX / window.innerWidth;
-        if (ratio < 0.35)       prevPage();
-        else if (ratio > 0.65)  nextPage();
-        // 中间 30% 不响应
+      if (!_dragging && Math.abs(dx) < 12 && Math.abs(dy) < 12 && dt < 300) {
+        // tap：左 35% 上翻，右 35% 下翻，中间 30% 不响应
+        const rx = e.changedTouches[0].clientX / window.innerWidth;
+        if (rx < 0.35) prevPage();
+        else if (rx > 0.65) nextPage();
         return;
       }
 
-      // 滑动翻页
-      if (_dragging && absDx > absDy * 1.2 && dt < 500) {
-        if (dx < -50)      nextPage();
-        else if (dx > 50)  prevPage();
+      if (_dragging && Math.abs(dx) > Math.abs(dy) * 1.2 && dt < 500) {
+        if (dx < -50) nextPage();
+        else if (dx > 50) prevPage();
       }
     }, { passive: true });
   }
 
   function onKey(e) {
     if (!_overlay || _overlay.style.display === 'none') return;
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown')  nextPage();
-    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')    prevPage();
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextPage();
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')  prevPage();
     if (e.key === 'Escape') close();
   }
 
   // ===========================
-  // 5. 公开 API
+  // 公开 API
   // ===========================
   function open(html, title) {
     buildDOM();
-
-    // 标题
-    const titleEl = document.getElementById('pr-title');
-    if (titleEl) titleEl.textContent = title || '';
-
-    // 分页（异步，让浏览器先渲染 overlay）
+    _titleEl.textContent = title || '';
+    _strip.innerHTML = '<div style="padding:40px 0;text-align:center;color:rgba(255,255,255,.3)">排版中…</div>';
     _overlay.style.display = 'flex';
-    _pageEl.innerHTML = '<div style="padding:40px 0;text-align:center;color:rgba(255,255,255,.3)">排版中…</div>';
-    _counter.textContent = '';
 
-    requestAnimationFrame(() => {
-      pages   = splitPages(html);
-      curPage = 0;
-      render(0);
-    });
+    // 用两帧确保 overlay 已完成布局再测量
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      totalPages = calcPages(html);
+      curPage    = 0;
+      goTo(0, false);
+    }));
   }
 
   function close() {
     if (_overlay) _overlay.style.display = 'none';
-    document.removeEventListener('keydown', onKey);
     pages = []; curPage = 0;
   }
 
-  // 暴露翻页给外部（章节切换时跳到第1页）
-  function reset() { curPage = 0; if (pages.length) render(0); }
-
-  return { open, close, reset, nextPage, prevPage,
-           get isOpen() { return _overlay && _overlay.style.display !== 'none'; } };
+  return {
+    open, close,
+    nextPage, prevPage,
+    get isOpen() { return !!(_overlay && _overlay.style.display !== 'none'); },
+  };
 })();
