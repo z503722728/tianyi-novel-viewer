@@ -1,0 +1,18 @@
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+
+/*.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/assets/*.js
+  Cache-Control: public, max-age=31536000, immutable
+
+/assets/*.css
+  Cache-Control: public, max-age=31536000, immutable
+
+/data/*.json
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/data/*.enc
+  Cache-Control: no-cache, no-store, must-revalidate
