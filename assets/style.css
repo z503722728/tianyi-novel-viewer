@@ -60,7 +60,7 @@ html, body {
 .logo h1 { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 6px; }
 .subtitle { color: var(--text2); font-size: 13px; }
 
-.unlock-form label { display: block; font-size: 13px; color: var(--text2); margin-bottom: 8px; }
+.unlock-form label:not(.checkbox-row) { display: block; font-size: 13px; color: var(--text2); margin-bottom: 8px; }
 .input-row { display: flex; gap: 8px; margin-bottom: 16px; }
 .input-row input {
   flex: 1;
@@ -344,7 +344,63 @@ html, body {
 }
 .search-input:focus { border-color: var(--accent); }
 
+/* ===== 书架 ===== */
+.book-card {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s;
+}
+.book-card:active { transform: scale(0.98); }
+.book-card:hover { border-color: var(--accent); }
+.book-cover {
+  width: 52px; height: 68px; flex-shrink: 0;
+  border-radius: 6px;
+  background: linear-gradient(135deg, var(--accent), #c084fc);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; font-weight: 900; color: white;
+  box-shadow: 3px 3px 10px rgba(0,0,0,0.4);
+}
+.book-info { flex: 1; min-width: 0; }
+.book-title { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.book-meta  { font-size: 13px; color: var(--text2); margin-bottom: 2px; }
+.book-arrow { font-size: 22px; color: var(--text3); }
+
+/* ===== 密钥记忆 checkbox ===== */
+.checkbox-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 14px; cursor: pointer;
+  font-size: 13px; color: var(--text2);
+}
+.checkbox-row input[type=checkbox] {
+  width: 16px; height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ===== 顶部菜单 ===== */
+.top-menu {
+  position: fixed; top: 54px; right: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  z-index: 200; overflow: hidden;
+  min-width: 140px;
+}
+.top-menu button {
+  display: block; width: 100%;
+  background: none; border: none;
+  padding: 12px 18px; text-align: left;
+  color: var(--text); font-size: 14px;
+  cursor: pointer; transition: background 0.15s;
+}
+.top-menu button:active { background: var(--border); }
+.top-menu button + button { border-top: 1px solid var(--border); }
+
 @media (prefers-color-scheme: light) {
-  /* 强制暗色，小说阅读器始终暗色 */
   html { color-scheme: dark; }
 }
