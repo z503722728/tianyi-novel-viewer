@@ -67,16 +67,40 @@ def load_novel_project(project_dir: str) -> dict:
             result["world_name"] = result["world"].get("world_name", "未知世界")
         print(f"  ✅ 世界观: {result['world_name']}")
 
-    # 时间轴
-    timeline_file = p / "timeline.json"
-    if timeline_file.exists():
-        with open(timeline_file, encoding='utf-8') as f:
-            tl = json.load(f)
+    # 时间轴（在 history/timeline.json）
+    for tl_path in [p / "history" / "timeline.json", p / "timeline.json"]:
+        if tl_path.exists():
+            with open(tl_path, encoding='utf-8') as f:
+                tl = json.load(f)
             if isinstance(tl, list):
                 result["timeline"] = tl
             elif isinstance(tl, dict):
-                result["timeline"] = tl.get("nodes", tl.get("events", []))
-        print(f"  ✅ 时间轴: {len(result['timeline'])} 个节点")
+                # 天意系统格式：合并 eras + power_shifts + battle_milestones
+                nodes = []
+                for era in tl.get("eras", []):
+                    nodes.append({
+                        "year": era.get("name", ""),
+                        "event": era.get("macro_trend", ""),
+                        "description": f"章节范围：第{era['chapter_range'][0]}~{era['chapter_range'][1]}章" if era.get("chapter_range") else "",
+                        "type": "era"
+                    })
+                for ps in tl.get("power_shifts", []):
+                    nodes.append({
+                        "year": ps.get("name", ""),
+                        "event": ps.get("outcome", ""),
+                        "description": ps.get("trigger_conditions", [""])[0] if ps.get("trigger_conditions") else "",
+                        "type": "power_shift"
+                    })
+                for bm in tl.get("battle_milestones", []):
+                    nodes.append({
+                        "year": bm.get("name", ""),
+                        "event": bm.get("outcome", ""),
+                        "description": f"策略：{bm.get('strategy_archetype','')}",
+                        "type": "battle"
+                    })
+                result["timeline"] = nodes
+            print(f"  ✅ 时间轴: {len(result['timeline'])} 个节点")
+            break
 
     # 章节（读取 ch_*.txt 和对应蓝图 ch_*.json）
     chap_txts = sorted(glob.glob(str(p / "content" / "chapters" / "ch_*.txt")))

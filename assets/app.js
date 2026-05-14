@@ -259,7 +259,16 @@
       <h1>${escHtml(w.world_name || '世界观')}</h1>
       <p class="no-indent">${escHtml(w.world_description || '')}</p>
       ${w.magic_system ? `<h2>修炼体系</h2><p>${escHtml(w.magic_system)}</p>` : ''}
-      ${w.world_rules?.length ? `<h2>世界规则</h2>${w.world_rules.map(r => `<p>• ${escHtml(r)}</p>`).join('')}` : ''}
+      ${w.world_rules?.length ? `<h2>世界规则</h2>${w.world_rules.map(r => {
+        if (typeof r === 'string') return `<p>• ${escHtml(r)}</p>`;
+        const name = r.name || r.rule_id || '';
+        const desc = r.description || '';
+        return `<div class="char-card" style="margin-bottom:10px">
+          <div style="font-size:14px;font-weight:600;color:var(--accent2);margin-bottom:4px">${escHtml(name)}</div>
+          <div style="font-size:13px;color:var(--text2)">${escHtml(desc)}</div>
+          ${r.is_hard_constraint ? '<div style="font-size:11px;color:var(--red);margin-top:4px">⚠ 硬性约束</div>' : ''}
+        </div>`;
+      }).join('')}` : ''}
       ${w.factions?.length ? `<h2>主要势力</h2>${w.factions.map(f => `
         <div class="char-card">
           <div class="char-name">${escHtml(f.name)}</div>
@@ -331,23 +340,26 @@
     showDetail(html, ch.name);
   }
 
-  // ===== 时间轴 =====
   function renderTimeline() {
     const grid = document.getElementById('card-grid');
     if (!timeline.length) {
       grid.innerHTML = `<div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-text">暂无历史记录</div></div>`;
       return;
     }
+    const typeIcon = { era: '🌐', power_shift: '⚔️', battle: '💥' };
+    const typeColor = { era: 'var(--accent)', power_shift: 'var(--red)', battle: 'var(--gold)' };
     let html = `<div class="update-time">共 ${timeline.length} 个节点</div><div class="timeline" style="padding:16px">`;
     timeline.forEach((node, i) => {
+      const dotColor = typeColor[node.type] || 'var(--accent)';
+      const icon = typeIcon[node.type] || '⏳';
       html += `
         <div class="tl-item">
           <div class="tl-dot-col">
-            <div class="tl-dot"></div>
+            <div class="tl-dot" style="background:${dotColor};border-color:${dotColor}"></div>
             ${i < timeline.length - 1 ? '<div class="tl-line"></div>' : ''}
           </div>
           <div class="tl-body">
-            <div class="tl-year">${escHtml(node.year || node.era || `节点 ${i+1}`)}</div>
+            <div class="tl-year">${icon} ${escHtml(node.year || node.era || `节点 ${i+1}`)}</div>
             <div class="tl-event">${escHtml(node.event || node.title || '')}</div>
             ${node.description ? `<div class="tl-desc">${escHtml(node.description)}</div>` : ''}
           </div>
