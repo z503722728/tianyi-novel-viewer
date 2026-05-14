@@ -351,6 +351,21 @@
     else { showView('home-view'); document.getElementById('current-title').textContent = currentBook?.world_name || '天意'; }
   };
 
+  // ===== 手势翻页接口（供 gesture.js 调用）=====
+  let _currentChapterIndex = -1;
+
+  window._getCurrentChapterIndex = () => _currentChapterIndex;
+  window._currentBook            = null;   // gesture.js 读取
+
+  window._showChapterByIndex = (idx) => {
+    const chapters = currentBook?.chapters || [];
+    if (idx < 0 || idx >= chapters.length) return;
+    _currentChapterIndex = idx;
+    showChapterDetail(chapters[idx]);
+    // 滚到顶
+    document.querySelector('.content-area').scrollTop = 0;
+  };
+
   // ===== 章节列表（LazyList）=====
   function renderChapterList() {
     const chs = currentBook?.chapters || [];
@@ -372,6 +387,10 @@
     });
   }
   function showChapterDetail(ch) {
+    // 同步当前章节 index，供手势翻页使用
+    const chapters = currentBook?.chapters || [];
+    _currentChapterIndex = chapters.findIndex(c => c === ch || c.chapter_id === ch.chapter_id);
+    window._currentBook = currentBook;
     showDetail(`
       <h1>${escHtml(ch.title||'章节')}</h1>
       <div class="meta-row">
