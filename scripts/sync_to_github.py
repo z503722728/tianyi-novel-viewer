@@ -29,6 +29,30 @@ def derive_key(password: str, salt: bytes) -> bytes:
     kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=100000)
     return kdf.derive(password.encode('utf-8'))
 
+
+# ===== 段落切块（给前端锚点跳转用）=====
+def _split_blocks(content: str) -> list:
+    """
+    把章节正文按段落切成 blocks 列表。
+    每块：{"id": "block-N", "type": "heading"|"paragraph", "text": "..."}
+    空行跳过，标题(#开头)单独成块。
+    """
+    blocks = []
+    idx = 0
+    for line in content.split('\n'):
+        line_s = line.strip()
+        if not line_s:
+            continue
+        if line_s.startswith('#'):
+            btype = 'heading'
+            text  = line_s.lstrip('#').strip()
+        else:
+            btype = 'paragraph'
+            text  = line_s
+        blocks.append({"id": f"block-{idx}", "type": btype, "text": text})
+        idx += 1
+    return blocks
+
 def encrypt_aes_gcm(plaintext: str, password: str) -> str:
     """格式：base64(salt[16] + iv[12] + ciphertext+tag[16])"""
     if not HAS_CRYPTO:
@@ -62,38 +86,37 @@ def load_novel_project(project_dir: str) -> dict:
             result["world_name"] = result["world"].get("world_name", "未知世界")
         print(f"  ✅ 世界观: {result['world_name']}")
 
-    # 时间轴
+    # 时间轴（完整结构，不再展平，前端分类展示）
     for tl_path in [p / "history" / "timeline.json", p / "timeline.json"]:
         if tl_path.exists():
             with open(tl_path, encoding='utf-8') as f:
                 tl = json.load(f)
-            if isinstance(tl, list):
-                result["timeline"] = tl
-            elif isinstance(tl, dict):
+            if isinstance(tl, dict):
+                result["eras"]             = tl.get("eras", [])
+                result["power_shifts"]     = tl.get("power_shifts", [])
+                result["battle_milestones"]= tl.get("battle_milestones", [])
+                result["character_fates"]  = tl.get("character_fates", [])
+                result["history_nodes"]    = tl.get("history_nodes", [])
+                result["history_archetypes"]= tl.get("history_archetypes", [])
+                # 兼容旧 timeline 字段（展平供时间轴页使用）
                 nodes = []
-                for era in tl.get("eras", []):
-                    nodes.append({
-                        "year": era.get("name", ""),
-                        "event": era.get("macro_trend", ""),
-                        "description": f"章节范围：第{era['chapter_range'][0]}~{era['chapter_range'][1]}章" if era.get("chapter_range") else "",
-                        "type": "era"
-                    })
-                for ps in tl.get("power_shifts", []):
-                    nodes.append({
-                        "year": ps.get("name", ""),
-                        "event": ps.get("outcome", ""),
-                        "description": (ps.get("trigger_conditions") or [""])[0],
-                        "type": "power_shift"
-                    })
-                for bm in tl.get("battle_milestones", []):
-                    nodes.append({
-                        "year": bm.get("name", ""),
-                        "event": bm.get("outcome", ""),
-                        "description": f"策略：{bm.get('strategy_archetype', '')}",
-                        "type": "battle"
-                    })
+                for era in result["eras"]:
+                    nodes.append({"year": era.get("name",""), "event": era.get("macro_trend",""),
+                        "description": f"第{era['chapter_range'][0]}~{era['chapter_range'][1]}章" if era.get("chapter_range") else "",
+                        "type": "era"})
+                for ps in result["power_shifts"]:
+                    nodes.append({"year": ps.get("name",""), "event": ps.get("outcome",""),
+                        "description": "、".join(ps.get("trigger_conditions") or [])[:80],
+                        "type": "power_shift"})
+                for bm in result["battle_milestones"]:
+                    nodes.append({"year": bm.get("name",""), "event": bm.get("outcome",""),
+                        "description": f"策略：{bm.get('strategy_archetype','')}",
+                        "type": "battle"})
                 result["timeline"] = nodes
-            print(f"  ✅ 时间轴: {len(result['timeline'])} 个节点")
+            else:
+                result["timeline"] = tl if isinstance(tl, list) else []
+            total = sum(len(result.get(k,[])) for k in ["eras","power_shifts","battle_milestones","character_fates","history_nodes"])
+            print(f"  ✅ 历史数据: eras={len(result['eras'])} power_shifts={len(result['power_shifts'])} battles={len(result['battle_milestones'])} fates={len(result['character_fates'])} nodes={len(result['history_nodes'])}")
             break
 
     # 章节
@@ -112,9 +135,12 @@ def load_novel_project(project_dir: str) -> dict:
             if line:
                 title = line
                 break
+        # 段落切块：每块加 block_id，供前端锚点跳转
+        blocks = _split_blocks(content)
         ch_data = {
             "chapter_id": ch_id, "chapter_num": ch_num,
             "title": title, "content": content,
+            "blocks": blocks,
             "word_count": word_count,
             "summary": content[:100].replace('\n', ' ') + '…',
         }
@@ -141,6 +167,8 @@ def load_novel_project(project_dir: str) -> dict:
 def write_book_data(data: dict, password: str, viewer_dir: str, book_id: str):
     book_dir = Path(viewer_dir) / "data" / book_id
     book_dir.mkdir(parents=True, exist_ok=True)
+    # 把 book_id 写入加密数据，前端路由依赖它
+    data["book_id"] = book_id
 
     # 加密主数据
     index_json = json.dumps(data, ensure_ascii=False, separators=(',', ':'))

@@ -13,6 +13,129 @@
   let backTarget  = null;
   let _lazyList   = null;
 
+  // ===== Hash 路由 =====
+  // 格式：#/book/{bookId}/chapter/{num}/block/{blockId}
+  //       #/book/{bookId}/chapter/{num}
+  //       #/book/{bookId}/setting/{section}
+  //       #/book/{bookId}/characters/{charName}
+  //       #/book/{bookId}/history/{section}
+  //       #/book/{bookId}
+
+  const Router = (() => {
+    // 解析 hash 为路由对象
+    function parse(hash) {
+      const h = (hash || location.hash || '').replace(/^#\/?/, '');
+      if (!h) return null;
+      const parts = h.split('/');
+      if (parts[0] !== 'book' || !parts[1]) return null;
+      const route = { bookId: decodeURIComponent(parts[1]) };
+      if (parts[2]) {
+        route.section = parts[2];          // chapter / setting / characters / history
+        route.param   = parts[3] ? decodeURIComponent(parts[3]) : null;  // num / section名
+        route.sub     = parts[4] ? parts[4] : null;  // block
+        route.subId   = parts[5] ? decodeURIComponent(parts[5]) : null;  // block-N
+      }
+      return route;
+    }
+
+    // 生成 hash 字符串（供外部调用生成链接）
+    function build(bookId, section, param, sub, subId) {
+      let h = `#/book/${encodeURIComponent(bookId)}`;
+      if (section) h += `/${section}`;
+      if (param  ) h += `/${encodeURIComponent(String(param))}`;
+      if (sub    ) h += `/${sub}`;
+      if (subId  ) h += `/${encodeURIComponent(subId)}`;
+      return h;
+    }
+
+    // 把当前状态写入 hash（不触发 hashchange）
+    function set(bookId, section, param, sub, subId) {
+      const h = build(bookId, section, param, sub, subId);
+      history.replaceState(null, '', h);
+    }
+
+    // 导航到 hash 路由（异步，解锁后自动执行）
+    async function navigate(route) {
+      if (!route || !route.bookId) return;
+
+      // 如果当前没有加载该书，先加载
+      if (!currentBook || currentBook.book_id !== route.bookId) {
+        // 找到对应书的 meta
+        try {
+          const res = await fetch('data/books.json?' + Date.now());
+          if (!res.ok) return;
+          const books = await res.json();
+          const meta = books.find(b => b.book_id === route.bookId || b.world_name === route.bookId);
+          if (!meta) return;
+          await openBook(meta);
+        } catch (e) { return; }
+      }
+
+      // 导航到对应位置
+      const { section, param, sub, subId } = route;
+      if (!section || section === 'home') return; // 已在首页
+
+      if (section === 'chapter') {
+        const chNum = parseInt(param, 10);
+        const ch = (currentBook?.chapters || []).find(c => c.chapter_num === chNum);
+        if (ch) {
+          showChapterDetail(ch);
+          // 等 PagedReader 打开后跳到对应 block
+          if (sub === 'block' && subId) {
+            setTimeout(() => scrollToBlock(subId), 400);
+          }
+        }
+        return;
+      }
+      if (section === 'setting') {
+        switchNav('world');
+        if (param === 'world')   setTimeout(showWorldDetail,  100);
+        if (param === 'magic')   setTimeout(showMagicSystem,  100);
+        if (param === 'rules')   setTimeout(showWorldRules,   100);
+        if (param === 'factions')setTimeout(showFactions,     100);
+        if (param === 'locations')setTimeout(showLocations,   100);
+        return;
+      }
+      if (section === 'characters') {
+        switchNav('characters');
+        if (param) {
+          setTimeout(() => {
+            const c = (currentBook?.world?.characters || []).find(x => x.name === param || x.character_id === param);
+            if (c) showCharDetail(c);
+          }, 100);
+        }
+        return;
+      }
+      if (section === 'history') {
+        switchNav('timeline');
+        if (param === 'eras')         setTimeout(showEras,         100);
+        if (param === 'battles')      setTimeout(showBattles,      100);
+        if (param === 'power_shifts') setTimeout(showPowerShifts,  100);
+        if (param === 'char_fates')   setTimeout(showCharFates,    100);
+        if (param === 'nodes')        setTimeout(showHistoryNodes, 100);
+        if (param === 'timeline')     setTimeout(showTimeline,     100);
+        return;
+      }
+    }
+
+    // 滚动到 block（翻页阅读器内）
+    function scrollToBlock(blockId) {
+      const el = document.getElementById(blockId);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // 监听 hashchange（用户点击链接或浏览器前进后退）
+    window.addEventListener('hashchange', async () => {
+      const route = parse(location.hash);
+      if (route && window._sessionKey) await navigate(route);
+    });
+
+    return { parse, build, set, navigate };
+  })();
+
+  // 暴露给外部：生成链接
+  window.RouterBuild = Router.build;
+
   // ===== LazyList =====
   class LazyList {
     constructor({ container, items, renderItem, batch = 20, maxDom = 60 }) {
@@ -78,6 +201,9 @@
         window._sessionKey = pwd;
         document.getElementById('unlock-screen').classList.remove('active');
         document.getElementById('main-screen').classList.add('active');
+        // 解锁后检查是否有 hash 路由需要直接导航
+        const initRoute = Router.parse(location.hash);
+        if (initRoute) { await Router.navigate(initRoute); return; }
         await enterBookshelf(); return;
       }
     } catch (e) { console.warn('自动解锁失败', e); }
@@ -103,6 +229,9 @@
     if (document.getElementById('remember-key').checked) await TianYiCrypto.saveKey(pwd);
     document.getElementById('unlock-screen').classList.remove('active');
     document.getElementById('main-screen').classList.add('active');
+    // 解锁后检查是否有 hash 路由需要直接导航
+    const initRoute = Router.parse(location.hash);
+    if (initRoute) { await Router.navigate(initRoute); return; }
     await enterBookshelf();
   };
   window.clearSavedKey = () => { TianYiCrypto.clearKey(); showToast('已清除本地密钥'); };
@@ -169,7 +298,10 @@
     document.getElementById('bottom-nav').style.display = 'flex';
     try {
       const data = await TianYiCrypto.fetchDecrypted(`data/${encodeURIComponent(meta.book_id)}/index.enc`, window._sessionKey);
-      currentBook = data; renderBookHome();
+      currentBook = data;
+      currentBook.book_id = currentBook.book_id || meta.book_id;
+      Router.set(currentBook.book_id);
+      renderBookHome();
     } catch (e) {
       document.getElementById('card-grid').innerHTML = `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">加载失败: ${e.message}</div></div>`;
     }
@@ -391,7 +523,12 @@
     _currentChapterIndex = chapters.findIndex(c => c === ch || c.chapter_id === ch.chapter_id);
     window._currentBook = currentBook;
 
-    // 构建章节 HTML（头部信息 + 正文）
+    // 更新 hash 路由
+    if (currentBook?.book_id) {
+      Router.set(currentBook.book_id, 'chapter', ch.chapter_num);
+    }
+
+    // 构建章节 HTML（头部信息 + 正文，段落注入 block id）
     const headerHtml = `
       <h1 style="font-size:20px;font-weight:700;margin:0 0 12px;color:#fff">${escHtml(ch.title||'章节')}</h1>
       <div class="meta-row" style="margin-bottom:12px">
@@ -404,10 +541,20 @@
       ${ch.cost_this_chapter?`<blockquote style="border-left:3px solid var(--red,#ef4444);padding:8px 12px;margin:0 0 12px;background:rgba(239,68,68,.08);border-radius:0 8px 8px 0;font-size:14px;color:rgba(255,255,255,.6)">💔 ${escHtml(ch.cost_this_chapter)}</blockquote>`:''}
       <hr style="border:none;border-top:1px solid rgba(255,255,255,.1);margin:0 0 16px">
     `;
-    const bodyHtml = headerHtml + mdToHtml(ch.content || '（本章暂无正文）');
+
+    // 用 blocks 数据渲染正文（带 id），fallback 到 mdToHtml
+    let bodyHtml;
+    if (ch.blocks && ch.blocks.length) {
+      bodyHtml = ch.blocks.map(b => {
+        if (b.type === 'heading') return `<h2 id="${b.id}">${escHtml(b.text)}</h2>`;
+        return `<p id="${b.id}">${escHtml(b.text)}</p>`;
+      }).join('');
+    } else {
+      bodyHtml = mdToHtml(ch.content || '（本章暂无正文）');
+    }
 
     // 打开翻页阅读器
-    window.PagedReader.open(bodyHtml, ch.title || `第${ch.chapter_num}章`);
+    window.PagedReader.open(headerHtml + bodyHtml, ch.title || `第${ch.chapter_num}章`);
   }
 
   // ===== 设定中心（world tab）=====
@@ -443,6 +590,7 @@
   }
 
   function showWorldDetail() {
+    if (currentBook?.book_id) Router.set(currentBook.book_id, 'setting', 'world');
     const w = currentBook?.world; if (!w) return;
     showDetail(`
       <h1>${escHtml(w.world_name||'世界观')}</h1>
@@ -640,6 +788,7 @@
   }
 
   function showCharDetail(c) {
+    if (currentBook?.book_id) Router.set(currentBook.book_id, 'characters', c.name || c.character_id);
     const sym = c.symbol||{};
     // 找该角色的命运
     const fate = (currentBook?.character_fates||[]).find(f => f.character_id === c.char_id);
