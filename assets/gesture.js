@@ -130,7 +130,8 @@
   }
 
   // ===== 阅读页区域点击翻页 =====
-  // detail-view 上的透明点击层（不遮挡文字选中，只响应快速 tap）
+  // 注意：章节内翻页由 PagedReader 自身处理（左右区域点击 + 左右滑动）
+  // 这里只处理：阅读器关闭时，其他列表页的上下区域快捷跳章节
   document.addEventListener('DOMContentLoaded', () => {
     const contentArea = document.getElementById('content-area');
     if (!contentArea) return;
@@ -144,27 +145,20 @@
     }, { passive: true });
 
     contentArea.addEventListener('touchend', (e) => {
+      // 阅读器开着时不处理（阅读器自己处理翻页）
+      if (window.PagedReader && window.PagedReader.isOpen) return;
       if (!isDetailActive()) return;
 
       const t    = e.changedTouches[0];
       const dy   = Math.abs(t.clientY - tapStartY);
       const dx   = Math.abs(t.clientX - tapStartX);
       const dt   = Date.now() - tapStartTime;
-
-      // 只处理快速 tap（移动 < 12px，时间 < 300ms）
       if (dy > 12 || dx > 12 || dt > 300) return;
 
       const rect = contentArea.getBoundingClientRect();
       const relY = (t.clientY - rect.top) / rect.height;
-
-      if (relY < 0.30) {
-        // 上 30%：上一章
-        handlePageTurn('prev');
-      } else if (relY > 0.70) {
-        // 下 30%：下一章
-        handlePageTurn('next');
-      }
-      // 中间 40%：不处理，让正常文字选中生效
+      if (relY < 0.25)      handlePageTurn('prev');
+      else if (relY > 0.75) handlePageTurn('next');
     }, { passive: true });
   });
 

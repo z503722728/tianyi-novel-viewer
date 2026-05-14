@@ -362,8 +362,7 @@
     if (idx < 0 || idx >= chapters.length) return;
     _currentChapterIndex = idx;
     showChapterDetail(chapters[idx]);
-    // 滚到顶
-    document.querySelector('.content-area').scrollTop = 0;
+    // PagedReader 已全屏，无需手动滚顶
   };
 
   // ===== 章节列表（LazyList）=====
@@ -391,20 +390,24 @@
     const chapters = currentBook?.chapters || [];
     _currentChapterIndex = chapters.findIndex(c => c === ch || c.chapter_id === ch.chapter_id);
     window._currentBook = currentBook;
-    showDetail(`
-      <h1>${escHtml(ch.title||'章节')}</h1>
-      <div class="meta-row">
+
+    // 构建章节 HTML（头部信息 + 正文）
+    const headerHtml = `
+      <h1 style="font-size:20px;font-weight:700;margin:0 0 12px;color:#fff">${escHtml(ch.title||'章节')}</h1>
+      <div class="meta-row" style="margin-bottom:12px">
         <span class="tag">${ch.chapter_type==='dark_line_a'?'⚡ 暗线A':ch.chapter_type==='dark_line_b'?'⚡ 暗线B':'🎬 正线'}</span>
         <span class="tag">👁 ${escHtml(ch.pov_character||'主角')}</span>
         ${ch.word_count?`<span class="tag">${fmtNum(ch.word_count)} 字</span>`:''}
         ${ch.location?`<span class="tag">📍 ${escHtml(ch.location)}</span>`:''}
       </div>
-      ${ch.goal?`<blockquote>🎯 ${escHtml(ch.goal)}</blockquote>`:''}
-      ${ch.strategy_core?`<blockquote>♟ ${escHtml(ch.strategy_core)}</blockquote>`:''}
-      ${ch.cost_this_chapter?`<blockquote style="border-color:var(--red)">💔 ${escHtml(ch.cost_this_chapter)}</blockquote>`:''}
-      <div class="separator"></div>
-      ${mdToHtml(ch.content||'')}
-    `, ch.title, 'chapters');
+      ${ch.strategy_core?`<blockquote style="border-left:3px solid var(--accent);padding:8px 12px;margin:0 0 12px;background:rgba(124,92,252,.08);border-radius:0 8px 8px 0;font-size:14px;color:rgba(255,255,255,.6)">♟ ${escHtml(ch.strategy_core)}</blockquote>`:''}
+      ${ch.cost_this_chapter?`<blockquote style="border-left:3px solid var(--red,#ef4444);padding:8px 12px;margin:0 0 12px;background:rgba(239,68,68,.08);border-radius:0 8px 8px 0;font-size:14px;color:rgba(255,255,255,.6)">💔 ${escHtml(ch.cost_this_chapter)}</blockquote>`:''}
+      <hr style="border:none;border-top:1px solid rgba(255,255,255,.1);margin:0 0 16px">
+    `;
+    const bodyHtml = headerHtml + mdToHtml(ch.content || '（本章暂无正文）');
+
+    // 打开翻页阅读器
+    window.PagedReader.open(bodyHtml, ch.title || `第${ch.chapter_num}章`);
   }
 
   // ===== 设定中心（world tab）=====
