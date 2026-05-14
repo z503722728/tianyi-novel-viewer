@@ -404,3 +404,55 @@ html, body {
 @media (prefers-color-scheme: light) {
   html { color-scheme: dark; }
 }
+
+/* ===== 信息卡片（设定详情页用）===== */
+.info-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.info-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--accent2);
+  margin-bottom: 8px;
+}
+.fact-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.fact-label {
+  flex-shrink: 0;
+  color: var(--text3);
+  min-width: 64px;
+}
+.fact-val {
+  color: var(--text2);
+  flex: 1;
+}
+
+/* ===== 历史中心网格（hub 页用）===== */
+#card-grid .card .card-desc { min-height: 0; }
+
+/* ===== 详情页 tag 微调 ===== */
+.tag {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  color: var(--text2);
+  background: var(--bg2);
+}
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
