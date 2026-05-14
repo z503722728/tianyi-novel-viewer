@@ -103,14 +103,13 @@ window.PagedReader = (() => {
     _strip.id = 'pr-strip';
     Object.assign(_strip.style, {
       position: 'absolute', top: '0', left: '0', bottom: '0',
-      // 宽度和 column-width 在 open() 时设置
       columnGap: '0px',
-      padding: '16px 20px 36px',
+      padding: '0',          // padding 在 calcPages 的 wrapper 里，这里不设
       fontSize: '17px',
       lineHeight: '1.9',
       color: 'rgba(255,255,255,.88)',
       wordBreak: 'break-all',
-      boxSizing: 'border-box',
+      boxSizing: 'content-box',  // 必须 content-box，保证 width=N*vw 精确
       willChange: 'transform',
       transition: `transform ${ANIM_MS}ms cubic-bezier(.4,0,.2,1)`,
     });
@@ -147,27 +146,36 @@ window.PagedReader = (() => {
 
   // ===========================
   // 分页：用 CSS columns 原生分页
+  // 关键：strip 无 padding，column-width = vw（精确），
+  //        内容 padding 通过 wrapper div 实现，避免累计偏移
   // ===========================
   function calcPages(html) {
     const vw = window.innerWidth;
     const vh = window.innerHeight - 48 - 2; // 减去顶栏和进度条
+    const PH = 20, PT = 16, PB = 40;        // 水平/顶/底内边距
 
-    // 设置 strip 的 column 属性
-    _strip.style.width          = vw + 'px';       // 先设为单列宽，让浏览器计算自然高度
-    _strip.style.columnWidth    = vw + 'px';
-    _strip.style.columnCount    = 'auto';
-    _strip.innerHTML            = html;
-    _overlay.style.display      = 'flex';           // 必须可见才能测量
-    _strip.style.height         = vh + 'px';
+    // 用内层 wrapper 承载 padding，strip 本身宽=N*vw 无 padding
+    const wrapped = `<div style="padding:${PT}px ${PH}px ${PB}px;box-sizing:border-box;width:${vw}px;">${html}</div>`;
 
-    // 强制回流，获取实际列数
+    _strip.style.width       = vw + 'px';
+    _strip.style.columnWidth = vw + 'px';   // 每列精确等于 vw
+    _strip.style.columnCount = 'auto';
+    _strip.style.columnGap   = '0px';
+    _strip.style.padding     = '0';         // strip 无内边距！
+    _strip.style.boxSizing   = 'content-box';
+    _strip.style.height      = vh + 'px';
+    _strip.innerHTML         = wrapped;
+    _overlay.style.display   = 'flex';
+
+    // 强制回流，读实际 scrollWidth
+    void _strip.offsetWidth;
     const scrollW = _strip.scrollWidth;
-    const pages   = Math.max(1, Math.round(scrollW / vw));
+    const n       = Math.max(1, Math.round(scrollW / vw));
 
-    // 设置真实宽度（总列数 × vw）
-    _strip.style.width = (pages * vw) + 'px';
+    // 最终宽度精确等于 n * vw
+    _strip.style.width = (n * vw) + 'px';
 
-    return pages;
+    return n;
   }
 
   // ===========================
