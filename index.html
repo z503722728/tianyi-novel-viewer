@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>天意 · 小说世界</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <!-- 解锁界面 -->
+  <div id="unlock-screen" class="screen active">
+    <div class="unlock-card">
+      <div class="logo">
+        <div class="logo-icon">天</div>
+        <h1>天意 · 小说世界</h1>
+        <p class="subtitle">AI创作 · 世界观档案</p>
+      </div>
+      <div class="unlock-form">
+        <label for="password-input">输入阅读密钥</label>
+        <div class="input-row">
+          <input type="password" id="password-input" placeholder="请输入密钥..." autocomplete="off" maxlength="64">
+          <button class="btn-eye" id="toggle-pwd" onclick="togglePwd()">👁</button>
+        </div>
+        <button class="btn-primary" onclick="unlock()">解锁阅读</button>
+        <div id="unlock-error" class="error-msg hidden">密钥错误，请重试</div>
+        <p class="hint">密钥由作者提供，每次刷新页面需重新输入</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主阅读界面 -->
+  <div id="main-screen" class="screen">
+    <!-- 顶部导航 -->
+    <header class="top-bar">
+      <button class="btn-icon" onclick="showSidebar()" aria-label="菜单">☰</button>
+      <span id="current-title" class="top-title">天意 · 小说世界</span>
+      <button class="btn-icon" onclick="lockScreen()" aria-label="锁定">🔒</button>
+    </header>
+
+    <!-- 侧边栏 -->
+    <div id="sidebar" class="sidebar hidden">
+      <div class="sidebar-header">
+        <span>📚 内容目录</span>
+        <button class="btn-icon" onclick="hideSidebar()">✕</button>
+      </div>
+      <div id="sidebar-nav"></div>
+    </div>
+    <div id="overlay" class="overlay hidden" onclick="hideSidebar()"></div>
+
+    <!-- 主内容区 -->
+    <main id="content-area" class="content-area">
+      <div id="home-view" class="view active">
+        <div class="home-hero">
+          <div class="hero-title">天意创作档案</div>
+          <div class="hero-sub">解锁成功 · 正在加载...</div>
+        </div>
+        <div id="card-grid" class="card-grid"></div>
+      </div>
+      <div id="detail-view" class="view">
+        <button class="btn-back" onclick="goHome()">← 返回</button>
+        <div id="detail-content" class="detail-content"></div>
+      </div>
+    </main>
+
+    <!-- 底部导航 -->
+    <nav class="bottom-nav">
+      <button class="nav-item active" onclick="switchNav('home')" data-tab="home">
+        <span>🏠</span><span>首页</span>
+      </button>
+      <button class="nav-item" onclick="switchNav('chapters')" data-tab="chapters">
+        <span>📖</span><span>章节</span>
+      </button>
+      <button class="nav-item" onclick="switchNav('world')" data-tab="world">
+        <span>🌍</span><span>世界</span>
+      </button>
+      <button class="nav-item" onclick="switchNav('characters')" data-tab="characters">
+        <span>👥</span><span>角色</span>
+      </button>
+      <button class="nav-item" onclick="switchNav('timeline')" data-tab="timeline">
+        <span>⏳</span><span>历史</span>
+      </button>
+    </nav>
+  </div>
+
+  <script src="assets/crypto.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

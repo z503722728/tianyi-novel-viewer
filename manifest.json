@@ -1,0 +1,14 @@
+{
+  "name": "天意·小说世界",
+  "short_name": "天意",
+  "description": "天意AI小说世界观与剧情阅读站",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0f0f1a",
+  "theme_color": "#1a1a2e",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
