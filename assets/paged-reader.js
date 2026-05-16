@@ -205,40 +205,64 @@ window.PagedReader = (() => {
     if (fill) fill.style.width = ((curPage + 1) / totalPages * 100) + '%';
   }
 
-  // ── 翻页（返回 true=翻成功，false=已到边界触发章节跳转）──
+  // ── 边界翻页状态：末页/首页第一次翻页只提示，第二次才确认 ──
+  let _edgeTapPending = null;  // null | 'next' | 'prev'
+
+  function resetEdgeTap() { _edgeTapPending = null; }
+
   function nextPage() {
     if (curPage < totalPages - 1) {
+      resetEdgeTap();
       goTo(curPage + 1, true);
       return;
     }
-    // 末页 → 下一章
+    // 末页：第一次提示 -> 第二次才跳
     const idx = window._getCurrentChapterIndex ? window._getCurrentChapterIndex() : -1;
     const chaps = window._currentBook?.chapters || [];
-    if (idx >= 0 && idx < chaps.length - 1) {
-      flashEdge('right', '下一章');
+    if (idx < 0 || idx >= chaps.length - 1) {
+      flashEdge('right', '已是最新章');
+      resetEdgeTap();
+      return;
+    }
+    if (_edgeTapPending === 'next') {
+      // 第二次翻页 → 确认跳转
+      _edgeTapPending = null;
+      flashEdge('right', '下一章 ✓');
       setTimeout(() => {
         if (window._showChapterByIndex) window._showChapterByIndex(idx + 1);
-      }, 180);
+      }, 300);
     } else {
-      flashEdge('right', '已是最新章');
+      // 第一次翻页 → 仅提示
+      _edgeTapPending = 'next';
+      flashEdge('right', '再翻一次 → 下一章');
     }
   }
 
   function prevPage() {
     if (curPage > 0) {
+      resetEdgeTap();
       goTo(curPage - 1, true);
       return;
     }
-    // 首页 → 上一章
+    // 首页：第一次提示 -> 第二次才跳
     const idx = window._getCurrentChapterIndex ? window._getCurrentChapterIndex() : -1;
     const chaps = window._currentBook?.chapters || [];
-    if (idx > 0) {
-      flashEdge('left', '上一章');
+    if (idx <= 0) {
+      flashEdge('left', '已是第一章');
+      resetEdgeTap();
+      return;
+    }
+    if (_edgeTapPending === 'prev') {
+      // 第二次翻页 → 确认跳转
+      _edgeTapPending = null;
+      flashEdge('left', '上一章 ✓');
       setTimeout(() => {
         if (window._showChapterByIndex) window._showChapterByIndex(idx - 1);
-      }, 180);
+      }, 300);
     } else {
-      flashEdge('left', '已是第一章');
+      // 第一次翻页 → 仅提示
+      _edgeTapPending = 'prev';
+      flashEdge('left', '再翻一次 → 上一章');
     }
   }
 
