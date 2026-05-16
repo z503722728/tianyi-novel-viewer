@@ -17,6 +17,20 @@
 </head>
 <body>
 
+<script>
+  // 404.html：检测深层链接 → 先跳回首页（带 hash 路由），避免路径问题
+  (function() {
+    var BASE = '/tianyi-novel-viewer';
+    var path = location.pathname;
+    var isDeep = path !== BASE + '/' && path !== BASE + '/index.html' && path !== BASE;
+    if (isDeep) {
+      var route = path.replace(BASE, '');
+      location.replace(BASE + '/#' + route);
+      return;
+    }
+  })();
+</script>
+
 <div id="spinner-404">加载中...</div>
 
 <!-- ===== 解锁界面 ===== -->
