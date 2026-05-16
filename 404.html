@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>天意 · 小说世界</title>
+  <link rel="stylesheet" href="assets/style.css?v=1d7ec58pager-v4">
+  <link rel="manifest" href="manifest.json">
+  <style>
+    /* 404.html 专用：加载时提示 */
+    #spinner-404 {
+      position:fixed;inset:0;display:flex;align-items:center;justify-content:center;
+      background:#1a1a2e;color:rgba(255,255,255,.4);font-size:14px;z-index:9999;
+    }
+  </style>
+</head>
+<body>
+
+<div id="spinner-404">加载中...</div>
+
+<!-- ===== 解锁界面 ===== -->
+<div id="unlock-screen" class="screen active">
+  <div class="unlock-card">
+    <div class="logo">
+      <div class="logo-icon">天</div>
+      <h1>天意 · 小说世界</h1>
+      <p class="subtitle">AI创作 · 世界观档案</p>
+    </div>
+    <div class="unlock-form">
+      <label for="password-input">阅读密钥</label>
+      <div class="input-row">
+        <input type="password" id="password-input" placeholder="请输入密钥..." autocomplete="off" maxlength="64">
+        <button class="btn-eye" onclick="togglePwd()">👁</button>
+      </div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="remember-key" checked>
+        <span>记住密钥（存本地，下次自动解锁）</span>
+      </label>
+      <button class="btn-primary" id="unlock-btn" onclick="unlock()">解锁阅读</button>
+      <div id="unlock-error" class="error-msg hidden">密钥错误，请重试</div>
+      <p class="hint">密钥仅存储在您的设备本地，不会上传到任何服务器</p>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 主界面 ===== -->
+<div id="main-screen" class="screen">
+
+  <!-- 顶部栏 -->
+  <header class="top-bar">
+    <button class="btn-icon" onclick="showSidebar()">☰</button>
+    <span id="current-title" class="top-title">天意 · 小说世界</span>
+    <button class="btn-icon" onclick="showTopMenu()">⋯</button>
+  </header>
+
+  <!-- 顶部菜单弹出 -->
+  <div id="top-menu" class="top-menu hidden">
+    <button onclick="goBookshelf();hideTopMenu()">📚 书架</button>
+    <button onclick="clearSavedKey();hideTopMenu()">🗑 清除密钥</button>
+    <button onclick="lockScreen();hideTopMenu()">🔒 锁定</button>
+  </div>
+  <div id="top-menu-overlay" class="overlay hidden" onclick="hideTopMenu()"></div>
+
+  <!-- 侧边栏 -->
+  <div id="sidebar" class="sidebar hidden">
+    <div class="sidebar-header">
+      <span>📚 目录</span>
+      <button class="btn-icon" onclick="hideSidebar()">✕</button>
+    </div>
+    <div id="sidebar-nav"></div>
+  </div>
+  <div id="overlay" class="overlay hidden" onclick="hideSidebar()"></div>
+
+  <!-- 主内容区 -->
+  <main id="content-area" class="content-area">
+    <!-- 书架 -->
+    <div id="bookshelf-view" class="view active">
+      <div class="home-hero">
+        <div class="hero-title">我的书架</div>
+        <div class="hero-sub" id="bookshelf-sub">加载中...</div>
+      </div>
+      <div id="book-grid" class="card-grid"></div>
+    </div>
+    <!-- 书内首页 -->
+    <div id="home-view" class="view">
+      <div class="home-hero">
+        <div class="hero-title" id="book-hero-title">-</div>
+        <div class="hero-sub" id="book-hero-sub">-</div>
+      </div>
+      <div id="card-grid" class="card-grid"></div>
+    </div>
+    <!-- 详情页 -->
+    <div id="detail-view" class="view">
+      <button class="btn-back" id="back-btn" onclick="handleBack()">← 返回</button>
+      <div id="detail-content" class="detail-content"></div>
+    </div>
+  </main>
+
+  <!-- 底部导航（书内才显示） -->
+  <nav class="bottom-nav" id="bottom-nav" style="display:none">
+    <button class="nav-item active" onclick="switchNav('home')" data-tab="home">
+      <span>🏠</span><span>首页</span>
+    </button>
+    <button class="nav-item" onclick="switchNav('chapters')" data-tab="chapters">
+      <span>📖</span><span>章节</span>
+    </button>
+    <button class="nav-item" onclick="switchNav('world')" data-tab="world">
+      <span>🌍</span><span>设定</span>
+    </button>
+    <button class="nav-item" onclick="switchNav('characters')" data-tab="characters">
+      <span>👥</span><span>角色</span>
+    </button>
+    <button class="nav-item" onclick="switchNav('timeline')" data-tab="timeline">
+      <span>⚔️</span><span>历史</span>
+    </button>
+  </nav>
+
+</div>
+
+<script>
+  // 404.html SPA fallback：隐藏加载提示，让 app.js 接管路由
+  document.getElementById('spinner-404').style.display = 'none';
+</script>
+<script src="assets/crypto.js?v=1d7ec58pager-v4"></script>
+<script src="assets/app.js?v=1d7ec58pager-v4"></script>
+<script src="assets/paged-reader.js?v=1d7ec58pager-v4"></script>
+<script src="assets/gesture.js?v=1d7ec58pager-v4"></script>
+</body>
+</html>

@@ -9,7 +9,7 @@
 """
 import subprocess, sys, os
 
-PROJECT_DIR  = "/projects/tianyi-writer/output/novels/novel_v4_test"
+PROJECT_DIR  = "/home/hjx/projects/tianyi-writer/output/novels/novel_v4_test"
 PASSWORD     = "tianyi2026"
 REPO_DIR     = os.path.dirname(os.path.abspath(__file__))
 

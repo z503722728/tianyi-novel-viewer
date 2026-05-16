@@ -13,54 +13,66 @@
   let backTarget  = null;
   let _lazyList   = null;
 
-  // ===== Hash 路由 =====
-  // 格式：#/book/{bookId}/chapter/{num}/block/{blockId}
-  //       #/book/{bookId}/chapter/{num}
-  //       #/book/{bookId}/setting/{section}
-  //       #/book/{bookId}/characters/{charName}
-  //       #/book/{bookId}/history/{section}
-  //       #/book/{bookId}
+  // ===== 路径路由（path-based，无 #）=====
+  // 格式：/tianyi-novel-viewer/book/{bookId}/chapter/{num}/block/{blockId}
+  //       /tianyi-novel-viewer/book/{bookId}/chapter/{num}
+  //       /tianyi-novel-viewer/book/{bookId}/setting/{section}
+  //       /tianyi-novel-viewer/book/{bookId}/characters/{charName}
+  //       /tianyi-novel-viewer/book/{bookId}/history/{section}
+  //       /tianyi-novel-viewer/book/{bookId}
+
+  const BASE_PATH = '/tianyi-novel-viewer';
 
   const Router = (() => {
-    // 解析 hash 为路由对象
-    function parse(hash) {
-      const h = (hash || location.hash || '').replace(/^#\/?/, '');
-      if (!h) return null;
-      const parts = h.split('/');
+    // 从 pathname 解析路由对象（兼容旧 hash 格式）
+    function parse(path) {
+      const p = (path || location.pathname).replace(/^#\/?/, '');
+      if (!p) return null;
+      // 剥离 base path
+      let relative = p;
+      if (relative.startsWith(BASE_PATH)) {
+        relative = relative.slice(BASE_PATH.length) || '/';
+      }
+      const parts = relative.replace(/^\/+/, '').split('/');
       if (parts[0] !== 'book' || !parts[1]) return null;
       const route = { bookId: decodeURIComponent(parts[1]) };
       if (parts[2]) {
         route.section = parts[2];          // chapter / setting / characters / history
-        route.param   = parts[3] ? decodeURIComponent(parts[3]) : null;  // num / section名
-        route.sub     = parts[4] ? parts[4] : null;  // block
-        route.subId   = parts[5] ? decodeURIComponent(parts[5]) : null;  // block-N
+        route.param   = parts[3] ? decodeURIComponent(parts[3]) : null;
+        route.sub     = parts[4] ? parts[4] : null;
+        route.subId   = parts[5] ? decodeURIComponent(parts[5]) : null;
       }
       return route;
     }
 
-    // 生成 hash 字符串（供外部调用生成链接）
+    // 兼容旧 hash 格式：#/book/{bookId}/...
+    function parseHash(hash) {
+      if (!hash || !hash.startsWith('#/')) return null;
+      return parse(hash);
+    }
+
+    // 生成干净路径（供外部调用生成链接）
     function build(bookId, section, param, sub, subId) {
-      let h = `#/book/${encodeURIComponent(bookId)}`;
-      if (section) h += `/${section}`;
-      if (param  ) h += `/${encodeURIComponent(String(param))}`;
-      if (sub    ) h += `/${sub}`;
-      if (subId  ) h += `/${encodeURIComponent(subId)}`;
-      return h;
+      let p = BASE_PATH;
+      p += `/book/${encodeURIComponent(bookId)}`;
+      if (section) p += `/${section}`;
+      if (param  ) p += `/${encodeURIComponent(String(param))}`;
+      if (sub    ) p += `/${sub}`;
+      if (subId  ) p += `/${encodeURIComponent(subId)}`;
+      return p;
     }
 
-    // 把当前状态写入 hash（不触发 hashchange）
+    // 把当前状态写入地址栏（不触发 popstate）
     function set(bookId, section, param, sub, subId) {
-      const h = build(bookId, section, param, sub, subId);
-      history.replaceState(null, '', h);
+      const path = build(bookId, section, param, sub, subId);
+      history.replaceState(null, '', path);
     }
 
-    // 导航到 hash 路由（异步，解锁后自动执行）
+    // 导航到路径路由（异步，解锁后自动执行）
     async function navigate(route) {
       if (!route || !route.bookId) return;
 
-      // 如果当前没有加载该书，先加载
       if (!currentBook || currentBook.book_id !== route.bookId) {
-        // 找到对应书的 meta
         try {
           const res = await fetch('data/books.json?' + Date.now());
           if (!res.ok) return;
@@ -71,16 +83,14 @@
         } catch (e) { return; }
       }
 
-      // 导航到对应位置
       const { section, param, sub, subId } = route;
-      if (!section || section === 'home') return; // 已在首页
+      if (!section || section === 'home') return;
 
       if (section === 'chapter') {
         const chNum = parseInt(param, 10);
         const ch = (currentBook?.chapters || []).find(c => c.chapter_num === chNum);
         if (ch) {
           showChapterDetail(ch);
-          // 等 PagedReader 打开后跳到对应 block
           if (sub === 'block' && subId) {
             setTimeout(() => scrollToBlock(subId), 400);
           }
@@ -118,22 +128,27 @@
       }
     }
 
-    // 滚动到 block（翻页阅读器内）
     function scrollToBlock(blockId) {
       const el = document.getElementById(blockId);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
-    // 监听 hashchange（用户点击链接或浏览器前进后退）
-    window.addEventListener('hashchange', async () => {
-      const route = parse(location.hash);
+    // 监听 popstate（浏览器前进/后退）
+    window.addEventListener('popstate', async () => {
+      const route = parse() || parseHash(location.hash);
       if (route && window._sessionKey) await navigate(route);
     });
 
-    return { parse, build, set, navigate };
+    // 监听旧 hashtag 变化（兼容手动修改地址栏 # 的情况）
+    window.addEventListener('hashchange', async () => {
+      const route = parseHash(location.hash);
+      if (route && window._sessionKey) await navigate(route);
+    });
+
+    return { parse, parseHash, build, set, navigate };
   })();
 
-  // 暴露给外部：生成链接
+  // 暴露给外部
   window.RouterBuild = Router.build;
 
   // ===== LazyList =====
@@ -201,8 +216,8 @@
         window._sessionKey = pwd;
         document.getElementById('unlock-screen').classList.remove('active');
         document.getElementById('main-screen').classList.add('active');
-        // 解锁后检查是否有 hash 路由需要直接导航
-        const initRoute = Router.parse(location.hash);
+        // 解锁后检查是否有路由需要直接导航（path优先，fallback到hash兼容旧链接）
+        const initRoute = Router.parse() || Router.parseHash(location.hash);
         if (initRoute) { await Router.navigate(initRoute); return; }
         await enterBookshelf(); return;
       }
@@ -229,8 +244,8 @@
     if (document.getElementById('remember-key').checked) await TianYiCrypto.saveKey(pwd);
     document.getElementById('unlock-screen').classList.remove('active');
     document.getElementById('main-screen').classList.add('active');
-    // 解锁后检查是否有 hash 路由需要直接导航
-    const initRoute = Router.parse(location.hash);
+    // 解锁后检查是否有路由需要直接导航（path优先，fallback到hash兼容旧链接）
+    const initRoute = Router.parse() || Router.parseHash(location.hash);
     if (initRoute) { await Router.navigate(initRoute); return; }
     await enterBookshelf();
   };

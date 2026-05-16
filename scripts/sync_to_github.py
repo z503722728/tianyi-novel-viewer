@@ -240,8 +240,8 @@ def git_push(viewer_dir: str, message: str) -> bool:
         new_hash = r.stdout.strip()
         if new_hash:
             _bump_version(viewer_dir, new_hash)
-            run(["git", "add", "index.html"])
-            r2 = subprocess.run(["git", "status", "--porcelain", "index.html"],
+            run(["git", "add", "index.html", "404.html"])
+            r2 = subprocess.run(["git", "status", "--porcelain", "index.html", "404.html"],
                                 cwd=viewer_dir, capture_output=True, text=True)
             if r2.stdout.strip():
                 run(["git", "commit", "-m", f"chore: bump asset version {new_hash}"])
@@ -249,13 +249,16 @@ def git_push(viewer_dir: str, message: str) -> bool:
     return ok
 
 def _bump_version(viewer_dir: str, new_hash: str):
-    """更新 index.html 里 ?v=xxxx 版本号"""
+    """更新 index.html 和 404.html 里 ?v=xxxx 版本号"""
     import re
-    html_path = Path(viewer_dir) / "index.html"
-    html = html_path.read_text(encoding='utf-8')
-    html = re.sub(r'\?v=[0-9a-f]+', f'?v={new_hash}', html)
-    html_path.write_text(html, encoding='utf-8')
-    print(f"  ✅ index.html 版本号 → ?v={new_hash}")
+    for fname in ('index.html', '404.html'):
+        html_path = Path(viewer_dir) / fname
+        if not html_path.exists():
+            continue
+        html = html_path.read_text(encoding='utf-8')
+        html = re.sub(r'\?v=[0-9a-f]+', f'?v={new_hash}', html)
+        html_path.write_text(html, encoding='utf-8')
+        print(f"  ✅ {fname} 版本号 → ?v={new_hash}")
 
 # ===== 主流程 =====
 def main():
