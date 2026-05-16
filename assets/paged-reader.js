@@ -170,7 +170,7 @@ window.PagedReader = (() => {
     // 强制回流，读实际 scrollWidth
     void _strip.offsetWidth;
     const scrollW = _strip.scrollWidth;
-    const n       = Math.max(1, Math.round(scrollW / vw));
+    const n       = Math.max(1, Math.ceil(scrollW / vw));
 
     // 最终宽度精确等于 n * vw
     _strip.style.width = (n * vw) + 'px';
