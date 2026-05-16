@@ -50,7 +50,7 @@ const TianYiCrypto = (() => {
   async function verifyPassword(password) {
     try {
       // 1. 先试 sentinel.enc（轻量，含明文标记）
-      const res = await fetch('data/sentinel.enc?' + Date.now());
+      const res = await fetch('/tianyi-novel-viewer/data/sentinel.enc?' + Date.now());
       if (res.ok) {
         const pt = await decrypt((await res.text()).trim(), password);
         if (pt !== null) return pt.startsWith('TIANYI_OK');
@@ -58,13 +58,13 @@ const TianYiCrypto = (() => {
       }
       // 2. sentinel 不存在 → 试解 books.json（不加密，直接可读）作为存在性检验，
       //    再试 sentinel 解密一次最新 enc 文件
-      const booksRes = await fetch('data/books.json?' + Date.now());
+      const booksRes = await fetch('/tianyi-novel-viewer/data/books.json?' + Date.now());
       if (!booksRes.ok) return false;
       const books = await booksRes.json();
       if (!books.length) return false;
       // 用第一本书 index.enc 验证密码
       const bid = encodeURIComponent(books[0].book_id);
-      const encRes = await fetch(`data/${bid}/index.enc?` + Date.now());
+      const encRes = await fetch(`/tianyi-novel-viewer/data/${bid}/index.enc?` + Date.now());
       if (!encRes.ok) return false;
       const pt2 = await decrypt((await encRes.text()).trim(), password);
       return pt2 !== null;

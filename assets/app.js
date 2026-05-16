@@ -74,7 +74,7 @@
 
       if (!currentBook || currentBook.book_id !== route.bookId) {
         try {
-          const res = await fetch('data/books.json?' + Date.now());
+          const res = await fetch('/tianyi-novel-viewer/data/books.json?' + Date.now());
           if (!res.ok) return;
           const books = await res.json();
           const meta = books.find(b => b.book_id === route.bookId || b.world_name === route.bookId);
@@ -278,7 +278,7 @@
     const grid = document.getElementById('book-grid');
     sub.textContent = '加载中...'; grid.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
     try {
-      const res = await fetch('data/books.json?' + Date.now());
+      const res = await fetch('/tianyi-novel-viewer/data/books.json?' + Date.now());
       if (!res.ok) throw new Error('books.json not found');
       const books = await res.json();
       sub.textContent = `共 ${books.length} 本书`; grid.innerHTML = '';
@@ -312,7 +312,7 @@
     document.getElementById('current-title').textContent = meta.world_name || '读书';
     document.getElementById('bottom-nav').style.display = 'flex';
     try {
-      const data = await TianYiCrypto.fetchDecrypted(`data/${encodeURIComponent(meta.book_id)}/index.enc`, window._sessionKey);
+      const data = await TianYiCrypto.fetchDecrypted(`/tianyi-novel-viewer/data/${encodeURIComponent(meta.book_id)}/index.enc`, window._sessionKey);
       currentBook = data;
       currentBook.book_id = currentBook.book_id || meta.book_id;
       Router.set(currentBook.book_id);
