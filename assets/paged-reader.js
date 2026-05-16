@@ -211,71 +211,61 @@ window.PagedReader = (() => {
     if (fill) fill.style.width = ((curPage + 1) / totalPages * 100) + '%';
   }
 
-  // ── 边界翻页状态 ──
+  // ── 末页翻页状态 ──
   let _edgeTapPending = null;  // null | 'next' | 'prev'
-  let _nextPageLastCall = 0;
-  let _prevPageLastCall = 0;
-
-  function resetEdgeTap() { _edgeTapPending = null; }
 
   function nextPage() {
-    const now = Date.now();
-    if (now - _nextPageLastCall < 500) return;  // 防止 touchend + onclick 双重触发
-    _nextPageLastCall = now;
-
-    if (curPage < totalPages - 1) {
-      resetEdgeTap();
-      goTo(curPage + 1, true);
+    // 先判断是否为末页
+    if (curPage >= totalPages - 1) {
+      const idx = window._getCurrentChapterIndex ? window._getCurrentChapterIndex() : -1;
+      const chaps = window._currentBook?.chapters || [];
+      if (idx < 0 || idx >= chaps.length - 1) {
+        flashEdge('right', '已是最新章');
+        _edgeTapPending = null;
+        return;
+      }
+      if (_edgeTapPending === 'next') {
+        _edgeTapPending = null;
+        flashEdge('right', '下一章 ✓');
+        setTimeout(() => {
+          if (window._showChapterByIndex) window._showChapterByIndex(idx + 1);
+        }, 300);
+      } else {
+        _edgeTapPending = 'next';
+        flashEdge('right', '再翻一次 → 下一章');
+      }
       return;
     }
-    // 末页：第一次提示 -> 第二次才跳
-    const idx = window._getCurrentChapterIndex ? window._getCurrentChapterIndex() : -1;
-    const chaps = window._currentBook?.chapters || [];
-    if (idx < 0 || idx >= chaps.length - 1) {
-      flashEdge('right', '已是最新章');
-      resetEdgeTap();
-      return;
-    }
-    if (_edgeTapPending === 'next') {
-      _edgeTapPending = null;
-      flashEdge('right', '下一章 ✓');
-      setTimeout(() => {
-        if (window._showChapterByIndex) window._showChapterByIndex(idx + 1);
-      }, 300);
-    } else {
-      _edgeTapPending = 'next';
-      flashEdge('right', '再翻一次 → 下一章');
-    }
+    // 不是末页，正常翻页
+    _edgeTapPending = null;
+    goTo(curPage + 1, true);
   }
 
   function prevPage() {
-    const now = Date.now();
-    if (now - _prevPageLastCall < 500) return;  // 防止 touchend + onclick 双重触发
-    _prevPageLastCall = now;
-
-    if (curPage > 0) {
-      resetEdgeTap();
-      goTo(curPage - 1, true);
+    // 先判断是否为首页
+    if (curPage <= 0) {
+      const idx = window._getCurrentChapterIndex ? window._getCurrentChapterIndex() : -1;
+      const chaps = window._currentBook?.chapters || [];
+      if (idx <= 0) {
+        flashEdge('left', '已是第一章');
+        _edgeTapPending = null;
+        return;
+      }
+      if (_edgeTapPending === 'prev') {
+        _edgeTapPending = null;
+        flashEdge('left', '上一章 ✓');
+        setTimeout(() => {
+          if (window._showChapterByIndex) window._showChapterByIndex(idx - 1);
+        }, 300);
+      } else {
+        _edgeTapPending = 'prev';
+        flashEdge('left', '再翻一次 → 上一章');
+      }
       return;
     }
-    // 首页：第一次提示 -> 第二次才跳
-    const idx = window._getCurrentChapterIndex ? window._getCurrentChapterIndex() : -1;
-    const chaps = window._currentBook?.chapters || [];
-    if (idx <= 0) {
-      flashEdge('left', '已是第一章');
-      resetEdgeTap();
-      return;
-    }
-    if (_edgeTapPending === 'prev') {
-      _edgeTapPending = null;
-      flashEdge('left', '上一章 ✓');
-      setTimeout(() => {
-        if (window._showChapterByIndex) window._showChapterByIndex(idx - 1);
-      }, 300);
-    } else {
-      _edgeTapPending = 'prev';
-      flashEdge('left', '再翻一次 → 上一章');
-    }
+    // 不是首页，正常翻页
+    _edgeTapPending = null;
+    goTo(curPage - 1, true);
   }
 
   // 边缘提示闪烁
