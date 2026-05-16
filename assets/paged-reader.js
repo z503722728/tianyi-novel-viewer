@@ -119,8 +119,14 @@ window.PagedReader = (() => {
     // 左右点击区（透明，不遮文字选中，只响应 tap）
     const tapLeft  = makeTapZone('left',  '35%');
     const tapRight = makeTapZone('right', '35%');
-    tapLeft.onclick  = () => prevPage();
-    tapRight.onclick = () => nextPage();
+    // pointerdown 仅响应鼠标（桌面端），移动端走 touchend gesture handler
+    // 防止 touch + click 双重触发绕过翻页判定
+    tapLeft.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse') { e.preventDefault(); prevPage(); }
+    });
+    tapRight.addEventListener('pointerdown', (e) => {
+      if (e.pointerType === 'mouse') { e.preventDefault(); nextPage(); }
+    });
     viewport.appendChild(tapLeft);
     viewport.appendChild(tapRight);
 
