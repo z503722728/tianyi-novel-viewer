@@ -205,12 +205,18 @@ window.PagedReader = (() => {
     if (fill) fill.style.width = ((curPage + 1) / totalPages * 100) + '%';
   }
 
-  // ── 边界翻页状态：末页/首页第一次翻页只提示，第二次才确认 ──
+  // ── 边界翻页状态 ──
   let _edgeTapPending = null;  // null | 'next' | 'prev'
+  let _nextPageLastCall = 0;
+  let _prevPageLastCall = 0;
 
   function resetEdgeTap() { _edgeTapPending = null; }
 
   function nextPage() {
+    const now = Date.now();
+    if (now - _nextPageLastCall < 500) return;  // 防止 touchend + onclick 双重触发
+    _nextPageLastCall = now;
+
     if (curPage < totalPages - 1) {
       resetEdgeTap();
       goTo(curPage + 1, true);
@@ -225,20 +231,22 @@ window.PagedReader = (() => {
       return;
     }
     if (_edgeTapPending === 'next') {
-      // 第二次翻页 → 确认跳转
       _edgeTapPending = null;
       flashEdge('right', '下一章 ✓');
       setTimeout(() => {
         if (window._showChapterByIndex) window._showChapterByIndex(idx + 1);
       }, 300);
     } else {
-      // 第一次翻页 → 仅提示
       _edgeTapPending = 'next';
       flashEdge('right', '再翻一次 → 下一章');
     }
   }
 
   function prevPage() {
+    const now = Date.now();
+    if (now - _prevPageLastCall < 500) return;  // 防止 touchend + onclick 双重触发
+    _prevPageLastCall = now;
+
     if (curPage > 0) {
       resetEdgeTap();
       goTo(curPage - 1, true);
@@ -253,14 +261,12 @@ window.PagedReader = (() => {
       return;
     }
     if (_edgeTapPending === 'prev') {
-      // 第二次翻页 → 确认跳转
       _edgeTapPending = null;
       flashEdge('left', '上一章 ✓');
       setTimeout(() => {
         if (window._showChapterByIndex) window._showChapterByIndex(idx - 1);
       }, 300);
     } else {
-      // 第一次翻页 → 仅提示
       _edgeTapPending = 'prev';
       flashEdge('left', '再翻一次 → 上一章');
     }
