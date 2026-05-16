@@ -33,5 +33,12 @@
     "chapter_count": 1,
     "total_words": 2978,
     "updated_at": "2026-05-16 20:49"
+  },
+  {
+    "book_id": "novel",
+    "world_name": "",
+    "chapter_count": 0,
+    "total_words": 0,
+    "updated_at": "2026-05-16 23:07"
   }
 ]
