@@ -22,6 +22,9 @@ window.PagedReader = (() => {
   let isAnimating = false;
   let chapterTitle = '';
 
+  // 缓存当前章节原始 HTML，供复制使用
+  let _rawHtml = '';
+
   // ===== DOM =====
   let _overlay   = null;
   let _strip     = null;   // 横向滚动条（columns 容器）
@@ -75,8 +78,20 @@ window.PagedReader = (() => {
     });
     closeBtn.onclick = close;
 
+    // 📋 一键复制按钮
+    const copyBtn = document.createElement('button');
+    copyBtn.textContent = '📋';
+    copyBtn.title = '复制正文';
+    Object.assign(copyBtn.style, {
+      background: 'none', border: 'none', color: 'rgba(255,255,255,.4)',
+      fontSize: '16px', cursor: 'pointer', padding: '8px 6px',
+      lineHeight: '1', flexShrink: '0',
+    });
+    copyBtn.onclick = copyContent;
+
     bar.appendChild(_titleEl);
     bar.appendChild(_counter);
+    bar.appendChild(copyBtn);
     bar.appendChild(closeBtn);
 
     // ── 进度条 ──
@@ -319,6 +334,7 @@ window.PagedReader = (() => {
   function open(html, title) {
     buildDOM();
     _titleEl.textContent = title || '';
+    _rawHtml = html;  // 缓存原始 HTML 供复制
     _strip.innerHTML = '<div style="padding:40px 0;text-align:center;color:rgba(255,255,255,.3)">排版中…</div>';
     _overlay.style.display = 'flex';
 
@@ -333,6 +349,75 @@ window.PagedReader = (() => {
   function close() {
     if (_overlay) _overlay.style.display = 'none';
     pages = []; curPage = 0;
+  }
+
+  // 📋 一键复制正文
+  function copyContent() {
+    if (!_rawHtml) return;
+
+    // 用临时 DOM 解析 HTML → 纯文本
+    const tmp = document.createElement('div');
+    tmp.innerHTML = _rawHtml;
+
+    // 遍历子节点，提取文本（块级元素间用空行分隔）
+    const lines = [];
+    function walk(node) {
+      if (node.nodeType === 3) {  // 文本节点
+        const t = node.textContent.replace(/\s+/g, ' ').trim();
+        if (t) lines.push(t);
+        return;
+      }
+      if (node.nodeType !== 1) return;
+      const tag = node.tagName.toLowerCase();
+      const blockTags = ['p','h1','h2','h3','blockquote','div','li','br'];
+      const isBlock = blockTags.includes(tag);
+
+      // 遍历子节点
+      for (let child = node.firstChild; child; child = child.nextSibling) {
+        walk(child);
+      }
+
+      // 块级元素后追加空行
+      if (isBlock && lines.length > 0 && !lines[lines.length-1].endsWith('\n\n')) {
+        lines.push('');
+      }
+    }
+    walk(tmp);
+
+    const text = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+
+    // 复制到剪贴板
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        flashCopyFeedback();
+      }).catch(() => {
+        fallbackCopy(text);
+      });
+    } else {
+      fallbackCopy(text);
+    }
+  }
+
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); flashCopyFeedback(); }
+    catch(e) { if (window.showToast) window.showToast('复制失败'); }
+    document.body.removeChild(ta);
+  }
+
+  function flashCopyFeedback() {
+    if (window.showToast) window.showToast('✅ 正文已复制');
+    // 按钮短暂变绿
+    const btn = _overlay?.querySelector('button[title="复制正文"]');
+    if (btn) {
+      const orig = btn.style.color;
+      btn.style.color = '#4ade80';
+      setTimeout(() => { btn.style.color = orig; }, 800);
+    }
   }
 
   return {
