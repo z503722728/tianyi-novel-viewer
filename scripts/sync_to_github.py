@@ -238,7 +238,7 @@ def git_push(viewer_dir: str, message: str) -> bool:
         if r.returncode != 0:
             print(f"  ⚠️  {' '.join(cmd)}: {r.stderr.strip()}")
         return r.returncode == 0
-    run(["git", "config", "http.sslBackend", "openssl"])
+    run(["git", "config", "http.sslBackend", "gnutls"])
     run(["git", "add", "data/"])
     status = subprocess.run(["git", "status", "--porcelain", "data/"],
                             cwd=viewer_dir, capture_output=True, text=True)
