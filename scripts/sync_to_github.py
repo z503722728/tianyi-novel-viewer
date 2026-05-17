@@ -86,6 +86,20 @@ def load_novel_project(project_dir: str) -> dict:
             result["world_name"] = result["world"].get("world_name", "未知世界")
         print(f"  ✅ 世界观: {result['world_name']}")
 
+    # ═══ 角色数据（v2.3+: 独立存 characters/ 目录，不再内嵌 world_data）═══
+    char_dir = p / "characters"
+    if char_dir.exists():
+        characters = []
+        for cf in sorted(char_dir.glob("*.json")):
+            try:
+                with open(cf, encoding='utf-8') as f:
+                    characters.append(json.load(f))
+            except Exception as e:
+                print(f"  ⚠️  角色加载失败 {cf.name}: {e}")
+        if characters:
+            result["world"]["characters"] = characters
+            print(f"  ✅ 角色: {len(characters)} 人（来自 characters/）")
+
     # 时间轴（完整结构，不再展平，前端分类展示）
     for tl_path in [p / "history" / "timeline.json", p / "timeline.json"]:
         if tl_path.exists():
