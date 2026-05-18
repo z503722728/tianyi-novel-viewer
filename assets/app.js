@@ -503,7 +503,7 @@
     destroyLazyList();
     if (backTarget === 'bookshelf') { enterBookshelf(); return; }
     // 返回对应 tab 的列表
-    const tabMap = { world: 'world', characters: 'characters', timeline: 'timeline', chapters: 'chapters' };
+    const tabMap = { world: 'world', characters: 'characters', timeline: 'timeline', chapters: 'chapters', plan: 'plan' };
     if (tabMap[currentTab]) { showView('home-view'); switchNav(currentTab); }
     else { showView('home-view'); document.getElementById('current-title').textContent = currentBook?.world_name || '天意'; }
   };
@@ -803,21 +803,21 @@
     // 大纲概览
     const outline = d.outline;
     if (outline) {
-      items.push({
+      items.push(makeCard({
         icon: '📐', title: '小说大纲', badge: '总纲',
         badgeClass: 'badge-history', desc: (outline.protagonist_arc||'').slice(0,80),
         onClick: () => showPlanOutline(outline)
-      });
+      }));
     }
 
     // 各章蓝图
     const bps = d.blueprints || [];
     if (bps.length) {
-      items.push({
+      items.push(makeCard({
         icon: '🗺', title: '章节蓝图', badge: `${bps.length}章`,
         badgeClass: 'badge-history', desc: '各章的写作目标、谋略核心与风格选择',
         onClick: () => showBlueprintList(bps)
-      });
+      }));
     }
 
     // 风格配置
@@ -826,18 +826,18 @@
     const allStyles = Array.from(usedStyles);
     if (allStyles.length) {
       const iconMap = {'base':'📄','combat_spectacle':'⚔️','confrontation_duel':'🤝','dub_flow':'😂','political_duel':'🎭','entrepreneur_mode':'💰','emotional_relief':'💔'};
-      items.push({
+      items.push(makeCard({
         icon: '🎨', title: '使用风格', badge: `${allStyles.length}种`,
         badgeClass: 'badge-history', desc: allStyles.map(s => `${iconMap[s]||'📌'} ${s}`).join('  '),
         onClick: () => showStyleOverview(bps)
-      });
+      }));
     }
 
     if (!items.length) {
       grid.innerHTML += '<p style="padding:16px;color:var(--text-dim)">暂无大纲和蓝图数据</p>';
       return;
     }
-    items.forEach(x => grid.appendChild(makeCard(x)));
+    items.forEach(el => grid.appendChild(el));
   }
 
   function showPlanOutline(outline) {
