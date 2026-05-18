@@ -404,26 +404,6 @@
       { icon: '📚', label: '切换书籍', fn: () => { enterBookshelf(); hideSidebar(); } },
     ]);
 
-    // 章节目录（超50折叠）
-    const chs = d.chapters || [];
-    if (chs.length) {
-      const sec = document.createElement('div'); sec.className = 'nav-section';
-      sec.innerHTML = `<div class="nav-section-title">章节（${chs.length}）</div>`;
-      chs.slice(0, 50).forEach(ch => {
-        const btn = document.createElement('button'); btn.className = 'nav-link';
-        btn.innerHTML = `<span class="nav-icon">${ch.chapter_type?.includes('dark')?'⚡':'📄'}</span>${escHtml(ch.title||`第${ch.chapter_num}章`)}`;
-        btn.onclick = () => { showChapterDetail(ch); hideSidebar(); };
-        sec.appendChild(btn);
-      });
-      if (chs.length > 50) {
-        const btn = document.createElement('button'); btn.className = 'nav-link';
-        btn.innerHTML = `<span class="nav-icon">＋</span>全部 ${chs.length} 章`;
-        btn.onclick = () => { switchNav('chapters'); hideSidebar(); };
-        sec.appendChild(btn);
-      }
-      nav.appendChild(sec);
-    }
-
     // 设定
     addSection('世界设定', [
       { icon: '🌍', label: '世界观',   fn: () => { showWorldDetail(); hideSidebar(); } },
@@ -445,26 +425,6 @@
       if (x.label === '历史节点')  return (d.history_nodes||[]).length > 0;
       return true;
     }));
-
-    // 角色（超30折叠）
-    const chars = d.world?.characters || [];
-    if (chars.length) {
-      const sec = document.createElement('div'); sec.className = 'nav-section';
-      sec.innerHTML = `<div class="nav-section-title">角色（${chars.length}）</div>`;
-      chars.slice(0, 30).forEach(c => {
-        const btn = document.createElement('button'); btn.className = 'nav-link';
-        btn.innerHTML = `<span class="nav-icon">${roleIcon(c.role_type)}</span>${escHtml(c.name)}`;
-        btn.onclick = () => { showCharDetail(c); hideSidebar(); };
-        sec.appendChild(btn);
-      });
-      if (chars.length > 30) {
-        const btn = document.createElement('button'); btn.className = 'nav-link';
-        btn.innerHTML = `<span class="nav-icon">＋</span>全部 ${chars.length} 位`;
-        btn.onclick = () => { switchNav('characters'); hideSidebar(); };
-        sec.appendChild(btn);
-      }
-      nav.appendChild(sec);
-    }
   }
 
   window.showSidebar = () => { document.getElementById('sidebar').classList.remove('hidden'); document.getElementById('overlay').classList.remove('hidden'); };
