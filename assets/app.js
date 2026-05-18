@@ -969,28 +969,15 @@
     `;
     if (onClick) {
       el.addEventListener('click', onClick);
-      // 触摸检测：只在 tap（非滚动）时触发，避免滑动误触
-      let _touchStartX = 0, _touchStartY = 0, _touchStartTime = 0;
-      el.addEventListener('touchstart', (e) => {
-        const t = e.touches[0];
-        _touchStartX = t.clientX;
-        _touchStartY = t.clientY;
+      // 触摸检测：短触（<200ms）才算点击，长按/滑动不算
+      let _touchStartTime = 0;
+      el.addEventListener('touchstart', () => {
         _touchStartTime = Date.now();
       }, { passive: true });
       el.addEventListener('touchend', (e) => {
-        if (!e.changedTouches) return;
-        const touch = e.changedTouches[0];
-        const dx = Math.abs(touch.clientX - _touchStartX);
-        const dy = Math.abs(touch.clientY - _touchStartY);
-        const dt = Date.now() - _touchStartTime;
-        // 只有移动距离 <10px 且时间 <300ms 才算 tap
-        if (dx > 10 || dy > 10 || dt > 300) return;
-        const rect = el.getBoundingClientRect();
-        if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
-            touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
-          e.preventDefault();
-          onClick(e);
-        }
+        if (Date.now() - _touchStartTime > 200) return;
+        e.preventDefault();
+        onClick(e);
       }, { passive: false });
     }
     return el;
