@@ -1007,7 +1007,19 @@
       <div class="card-desc">${escHtml(desc)}</div>
       ${stats&&stats.length?`<div class="card-stats">${stats.map(s=>`<div class="stat">${s.label} <span>${s.value}</span></div>`).join('')}</div>`:''}
     `;
-    if (onClick) el.addEventListener('click', onClick);
+    if (onClick) {
+      el.addEventListener('click', onClick);
+      el.addEventListener('touchend', (e) => {
+        if (!e.changedTouches) return;
+        const rect = el.getBoundingClientRect();
+        const touch = e.changedTouches[0];
+        if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+            touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+          e.preventDefault();
+          onClick(e);
+        }
+      }, { passive: false });
+    }
     el.style.touchAction = 'manipulation';
     return el;
   }
