@@ -806,7 +806,7 @@
       items.push({
         icon: '📐', title: '小说大纲', badge: '总纲',
         badgeClass: 'badge-history', desc: (outline.protagonist_arc||'').slice(0,80),
-        fn: () => showPlanOutline(outline)
+        onClick: () => showPlanOutline(outline)
       });
     }
 
@@ -816,7 +816,7 @@
       items.push({
         icon: '🗺', title: '章节蓝图', badge: `${bps.length}章`,
         badgeClass: 'badge-history', desc: '各章的写作目标、谋略核心与风格选择',
-        fn: () => showBlueprintList(bps)
+        onClick: () => showBlueprintList(bps)
       });
     }
 
@@ -829,7 +829,7 @@
       items.push({
         icon: '🎨', title: '使用风格', badge: `${allStyles.length}种`,
         badgeClass: 'badge-history', desc: allStyles.map(s => `${iconMap[s]||'📌'} ${s}`).join('  '),
-        fn: () => showStyleOverview(bps)
+        onClick: () => showStyleOverview(bps)
       });
     }
 
