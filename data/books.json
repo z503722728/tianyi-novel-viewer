@@ -1,65 +1,9 @@
 [
   {
-    "book_id": "天命裂痕",
-    "world_name": "天命裂痕",
-    "chapter_count": 5,
-    "total_words": 26016,
-    "updated_at": "2026-05-17 01:10"
-  },
-  {
-    "book_id": "债痕纪元",
-    "world_name": "债痕纪元",
-    "chapter_count": 10,
-    "total_words": 55425,
-    "updated_at": "2026-05-15 14:24"
-  },
-  {
     "book_id": "深渊纪元",
     "world_name": "深渊纪元",
     "chapter_count": 3,
     "total_words": 12834,
-    "updated_at": "2026-05-16 01:34"
-  },
-  {
-    "book_id": "苍玄大陆_九渊纪",
-    "world_name": "苍玄大陆·九渊纪",
-    "chapter_count": 0,
-    "total_words": 0,
-    "updated_at": "2026-05-16 17:33"
-  },
-  {
-    "book_id": "界垒",
-    "world_name": "界垒",
-    "chapter_count": 1,
-    "total_words": 2978,
-    "updated_at": "2026-05-16 20:49"
-  },
-  {
-    "book_id": "novel",
-    "world_name": "",
-    "chapter_count": 0,
-    "total_words": 0,
-    "updated_at": "2026-05-16 23:07"
-  },
-  {
-    "book_id": "灰疫废土",
-    "world_name": "灰疫废土",
-    "chapter_count": 1,
-    "total_words": 3822,
-    "updated_at": "2026-05-17 14:15"
-  },
-  {
-    "book_id": "两界裂痕",
-    "world_name": "两界裂痕",
-    "chapter_count": 1,
-    "total_words": 4131,
-    "updated_at": "2026-05-17 15:06"
-  },
-  {
-    "book_id": "灰域纪元",
-    "world_name": "灰域纪元",
-    "chapter_count": 7,
-    "total_words": 24720,
-    "updated_at": "2026-05-18 15:18"
+    "updated_at": "2026-05-18 16:59"
   }
 ]
