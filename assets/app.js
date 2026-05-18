@@ -1007,7 +1007,9 @@
       <div class="card-desc">${escHtml(desc)}</div>
       ${stats&&stats.length?`<div class="card-stats">${stats.map(s=>`<div class="stat">${s.label} <span>${s.value}</span></div>`).join('')}</div>`:''}
     `;
-    el.onclick = onClick; return el;
+    if (onClick) el.addEventListener('click', onClick);
+    el.style.touchAction = 'manipulation';
+    return el;
   }
 
   window.showToast = (msg) => {

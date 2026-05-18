@@ -178,6 +178,7 @@ html, body {
   cursor: pointer;
   transition: border-color 0.2s, transform 0.15s;
   position: relative; overflow: hidden;
+  touch-action: manipulation;
 }
 .card:active { transform: scale(0.98); }
 .card::before {
@@ -420,6 +421,7 @@ html, body {
   border-radius: 12px;
   padding: 14px 16px;
   margin-bottom: 12px;
+  touch-action: manipulation;
 }
 .info-card-title {
   font-size: 15px;
