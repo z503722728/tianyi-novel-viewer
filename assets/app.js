@@ -126,6 +126,15 @@
         if (param === 'timeline')     setTimeout(showTimeline,     100);
         return;
       }
+      if (section === 'plan') {
+        switchNav('plan');
+        if (param === 'outline') setTimeout(showPlanOutline, 100);
+        if (param === 'blueprints') setTimeout(showBlueprintList, 100);
+        if (param && param.startsWith('ch_')) {
+          setTimeout(() => showBlueprintDetail(param), 100);
+        }
+        return;
+      }
     }
 
     function scrollToBlock(blockId) {
@@ -471,6 +480,7 @@
     if (tab === 'world')      return renderWorldHub();
     if (tab === 'characters') return renderCharList();
     if (tab === 'timeline')   return renderHistoryHub();
+    if (tab === 'plan')       return renderPlanHub();
   };
   function updateNavActive(tab) {
     document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
@@ -781,6 +791,143 @@
         return el;
       }
     });
+  }
+
+  // ===== 蓝图/大纲页面 =====
+  function renderPlanHub() {
+    const d = currentBook; if (!d) return;
+    const grid = document.getElementById('card-grid');
+    grid.innerHTML = `<div class="update-time">写作规划</div>`;
+    const items = [];
+
+    // 大纲概览
+    const outline = d.outline;
+    if (outline) {
+      items.push({
+        icon: '📐', title: '小说大纲', badge: '总纲',
+        badgeClass: 'badge-history', desc: (outline.protagonist_arc||'').slice(0,80),
+        fn: () => showPlanOutline(outline)
+      });
+    }
+
+    // 各章蓝图
+    const bps = d.blueprints || [];
+    if (bps.length) {
+      items.push({
+        icon: '🗺', title: '章节蓝图', badge: `${bps.length}章`,
+        badgeClass: 'badge-history', desc: '各章的写作目标、谋略核心与风格选择',
+        fn: () => showBlueprintList(bps)
+      });
+    }
+
+    // 风格配置
+    const usedStyles = new Set();
+    bps.forEach(bp => (bp.styles||[]).forEach(s => usedStyles.add(s)));
+    const allStyles = Array.from(usedStyles);
+    if (allStyles.length) {
+      const iconMap = {'base':'📄','combat_spectacle':'⚔️','confrontation_duel':'🤝','dub_flow':'😂','political_duel':'🎭','entrepreneur_mode':'💰','emotional_relief':'💔'};
+      items.push({
+        icon: '🎨', title: '使用风格', badge: `${allStyles.length}种`,
+        badgeClass: 'badge-history', desc: allStyles.map(s => `${iconMap[s]||'📌'} ${s}`).join('  '),
+        fn: () => showStyleOverview(bps)
+      });
+    }
+
+    if (!items.length) {
+      grid.innerHTML += '<p style="padding:16px;color:var(--text-dim)">暂无大纲和蓝图数据</p>';
+      return;
+    }
+    items.forEach(x => grid.appendChild(makeCard(x)));
+  }
+
+  function showPlanOutline(outline) {
+    const html = `
+      <h1>写作大纲</h1>
+      ${outline.world_name?`<div class="fact-row"><span class="fact-label">世界</span><span class="fact-val">${escHtml(outline.world_name)}</span></div>`:''}
+      ${outline.protagonist_arc?`<h2>主角弧线</h2><p>${escHtml(outline.protagonist_arc)}</p>`:''}
+      ${outline.central_conflict?`<h2>核心冲突</h2><p>${escHtml(outline.central_conflict)}</p>`:''}
+      ${outline.ending_vision?`<h2>结局构想</h2><p>${escHtml(outline.ending_vision)}</p>`:''}
+      ${outline.global_mysteries?`<h2>核心悬念</h2><p>${escHtml(outline.global_mysteries)}</p>`:''}
+      ${outline.theme?`<h2>主题</h2><p>${escHtml(outline.theme)}</p>`:''}
+    `;
+    showDetail(html, '小说大纲', 'plan');
+  }
+
+  function showBlueprintList(bps) {
+    const sorted = [...bps].sort((a,b) => (a.chapter_number||0) - (b.chapter_number||0));
+    const styleIcon = {'base':'','combat_spectacle':'⚔️','confrontation_duel':'🤝','dub_flow':'😂','political_duel':'🎭','entrepreneur_mode':'💰','emotional_relief':'💔'};
+    showDetail(`
+      <h1>章节蓝图</h1>
+      ${sorted.map(bp => {
+        const styles = (bp.styles||[]).map(s => styleIcon[s]||'📌').join(' ');
+        const chType = {'main_pov':'主角明线','dark_line_a':'⚡暗线A','dark_line_b':'⚡暗线B','character_interlude':'配角插曲','side_arc':'支线'}[bp.chapter_type]||bp.chapter_type;
+        return `<div class="info-card" onclick="showBlueprintDetail('${escHtml(bp.chapter_id)}')" style="cursor:pointer">
+          <div class="info-card-title">第${bp.chapter_number}章 ${escHtml(bp.title||'')} ${styles}</div>
+          <div class="meta-row">
+            <span class="tag">${chType}</span>
+            ${bp.pov_character?`<span class="tag">👁 ${escHtml(bp.pov_character)}</span>`:''}
+            ${bp.word_count_target?`<span class="tag">${bp.word_count_target}字</span>`:''}
+          </div>
+          <p class="no-indent">${escHtml((bp.goal||'').slice(0,80))}</p>
+          ${bp.strategy_core?`<div class="fact-row"><span class="fact-label">谋略</span><span class="fact-val">${escHtml(bp.strategy_core)}</span></div>`:''}
+          ${bp.cost_this_chapter?`<div class="fact-row"><span class="fact-label">代价</span><span class="fact-val">${escHtml(bp.cost_this_chapter)}</span></div>`:''}
+          ${bp.chapter_tension?`<div class="fact-row"><span class="fact-label">张力</span><span class="fact-val">${escHtml(bp.chapter_tension)}</span></div>`:''}
+        </div>`;
+      }).join('')}
+    `, '章节蓝图', 'plan');
+  }
+
+  window.showBlueprintDetail = (chapterId) => {
+    const bp = (currentBook?.blueprints||[]).find(b => b.chapter_id === chapterId);
+    if (!bp) return showToast('蓝图未找到');
+    const styleIcon = {'base':'📄base','combat_spectacle':'⚔️combat_spectacle','confrontation_duel':'🤝confrontation_duel','dub_flow':'😂dub_flow','political_duel':'🎭political_duel','entrepreneur_mode':'💰entrepreneur_mode','emotional_relief':'💔emotional_relief'};
+    const styles = (bp.styles||[]).map(s => styleIcon[s]||s).join('  ');
+    showDetail(`
+      <h1>第${bp.chapter_number}章 · ${escHtml(bp.title||'')}</h1>
+      <div class="meta-row">
+        <span class="tag">${escHtml(bp.chapter_type||'main_pov')}</span>
+        ${bp.pov_character?`<span class="tag">👁 ${escHtml(bp.pov_character)}</span>`:''}
+        ${bp.location?`<span class="tag">📍 ${escHtml(bp.location)}</span>`:''}
+        ${bp.word_count_target?`<span class="tag">${bp.word_count_target}字</span>`:''}
+        ${bp.cycle_position?`<span class="tag">周期${bp.cycle_position}/5</span>`:''}
+      </div>
+      ${styles ? `<div class="meta-row">写作风格：${styles}</div>` : ''}
+      ${bp.goal?`<h2>叙事目标</h2><p>${escHtml(bp.goal)}</p>`:''}
+      ${bp.strategy_core?`<div class="fact-row"><span class="fact-label">谋略核心</span><span class="fact-val">${escHtml(bp.strategy_core)}</span></div>`:''}
+      ${bp.cost_this_chapter?`<div class="fact-row"><span class="fact-label">本章代价</span><span class="fact-val">${escHtml(bp.cost_this_chapter)}</span></div>`:''}
+      ${bp.conflict_to_advance?`<div class="fact-row"><span class="fact-label">推进冲突</span><span class="fact-val">${escHtml(bp.conflict_to_advance)}</span></div>`:''}
+      <h2>游戏设计张力</h2>
+      ${bp.reader_emotion_target?`<div class="fact-row"><span class="fact-label">读者情绪</span><span class="fact-val">${escHtml(bp.reader_emotion_target)}</span></div>`:''}
+      ${bp.desire_and_obstacle?`<div class="fact-row"><span class="fact-label">欲望/阻碍</span><span class="fact-val">${escHtml(bp.desire_and_obstacle)}</span></div>`:''}
+      ${bp.chapter_tension?`<div class="fact-row"><span class="fact-label">章节张力</span><span class="fact-val">${escHtml(bp.chapter_tension)}</span></div>`:''}
+      ${bp.hook_strategy?`<div class="fact-row"><span class="fact-label">章尾截断</span><span class="fact-val">${escHtml(bp.hook_strategy)}</span></div>`:''}
+      ${bp.foreshadow_hints?.length ? `<h2>伏笔提示</h2><ul>${bp.foreshadow_hints.map(h=>`<li>${escHtml(h)}</li>`).join('')}</ul>` : ''}
+      ${bp.characters_required?.length ? `<h2>必需角色</h2><p>${bp.characters_required.map(escHtml).join('、')}</p>` : ''}
+      ${bp.reaction_roles?.length ? `<h2>旁观脑补位</h2><p>${bp.reaction_roles.map(escHtml).join('；')}</p>` : ''}
+      ${bp.relationship_targets?.length ? `<h2>关系变化目标</h2>${bp.relationship_targets.map(r=>`<div class="info-card" style="border-color:var(--accent)"><div class="fact-row"><span class="fact-label">${escHtml(r.character_a)}→${escHtml(r.character_b)}</span><span class="fact-val">${escHtml(r.direction)}</span></div>${(r.behavioral_indicators||[]).length?`<div>行为指标：${r.behavioral_indicators.map(escHtml).join('；')}</div>`:''}</div>`).join('')}` : ''}
+      ${bp.information_wrapper?`<h2>信息量包裹</h2><p>${escHtml(bp.information_wrapper)}</p>`:''}
+    `, `第${bp.chapter_number}章 蓝图`, 'plan');
+  };
+
+  function showStyleOverview(bps) {
+    const styleIcon = {'base':'📄','combat_spectacle':'⚔️','confrontation_duel':'🤝','dub_flow':'😂','political_duel':'🎭','entrepreneur_mode':'💰','emotional_relief':'💔'};
+    const styleNames = {'base':'通用基础','combat_spectacle':'战斗场面','confrontation_duel':'博弈对峙','dub_flow':'迪化流','political_duel':'政治权谋','entrepreneur_mode':'种田搞钱','emotional_relief':'命运抉择'};
+    // 统计每个风格被多少章使用
+    const usage = {};
+    bps.forEach(bp => (bp.styles||[]).forEach(s => { if (!usage[s]) usage[s] = []; usage[s].push(bp.chapter_number); }));
+    const sorted = Object.entries(usage).sort((a,b) => b[1].length - a[1].length);
+    showDetail(`
+      <h1>写作风格使用统计</h1>
+      ${sorted.map(([style, chapters]) => `
+        <div class="info-card">
+          <div class="info-card-title">${styleIcon[style]||'📌'} ${styleNames[style]||style}</div>
+          <div class="meta-row">
+            <span class="tag">使用 ${chapters.length} 章</span>
+          </div>
+          <p class="no-indent">章节：第${chapters.sort((a,b)=>a-b).join('、')}章</p>
+        </div>
+      `).join('')}
+    `, '写作风格', 'plan');
   }
 
   // ===== 角色列表（LazyList）=====

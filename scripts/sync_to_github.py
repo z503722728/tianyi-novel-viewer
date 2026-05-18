@@ -133,6 +133,31 @@ def load_novel_project(project_dir: str) -> dict:
             print(f"  ✅ 历史数据: eras={len(result['eras'])} power_shifts={len(result['power_shifts'])} battles={len(result['battle_milestones'])} fates={len(result['character_fates'])} nodes={len(result['history_nodes'])}")
             break
 
+    # ═══ 大纲数据 ═══
+    outline_path = p / "plan" / "outline.json"
+    if outline_path.exists():
+        try:
+            with open(outline_path, encoding='utf-8') as f:
+                result["outline"] = json.load(f)
+            print(f"  ✅ 大纲: {result.get('outline',{}).get('protagonist_arc','')[:60]}")
+        except Exception as e:
+            print(f"  ⚠️  大纲读取失败: {e}")
+
+    # ═══ 蓝图数据（全部章节，按章号排序） ═══
+    bp_dir = p / "plan" / "blueprints"
+    all_bps = []
+    if bp_dir.exists():
+        for bp_file in sorted(bp_dir.glob("ch_*.json")):
+            try:
+                with open(bp_file, encoding='utf-8') as f:
+                    bp = json.load(f)
+                all_bps.append(bp)
+            except Exception as e:
+                print(f"  ⚠️  蓝图读取失败 {bp_file.name}: {e}")
+        if all_bps:
+            result["blueprints"] = all_bps
+            print(f"  ✅ 蓝图: {len(all_bps)} 章")
+
     # 章节
     chap_txts = sorted(glob.glob(str(p / "content" / "chapters" / "ch_*.txt")))
     bp_dir = p / "plan" / "blueprints"
@@ -280,7 +305,7 @@ def main():
     parser.add_argument("--project-dir", required=True)
     parser.add_argument("--password",    required=True)
     parser.add_argument("--book-id",     default=None, help="自定义书ID（默认用世界名）")
-    parser.add_argument("--repo-dir",    default="/projects/tianyi-novel-viewer")
+    parser.add_argument("--repo-dir",    default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     parser.add_argument("--no-push",     action="store_true")
     args = parser.parse_args()
 
