@@ -1,37 +1,9 @@
 [
   {
-    "book_id": "深渊纪元",
-    "world_name": "深渊纪元",
-    "chapter_count": 5,
-    "total_words": 20908,
-    "updated_at": "2026-05-18 17:59"
-  },
-  {
-    "book_id": "疯神剧场",
-    "world_name": "疯神剧场",
-    "chapter_count": 0,
-    "total_words": 0,
-    "updated_at": "2026-05-18 19:04"
-  },
-  {
-    "book_id": "癫神剧场_模因深渊",
-    "world_name": "癫神剧场·模因深渊",
-    "chapter_count": 1,
-    "total_words": 2972,
-    "updated_at": "2026-05-18 21:00"
-  },
-  {
     "book_id": "癫神游戏场",
     "world_name": "癫神游戏场",
-    "chapter_count": 2,
-    "total_words": 7039,
-    "updated_at": "2026-05-18 22:12"
-  },
-  {
-    "book_id": "癫神弈局",
-    "world_name": "癫神弈局",
     "chapter_count": 1,
-    "total_words": 3933,
-    "updated_at": "2026-05-18 22:35"
+    "total_words": 3809,
+    "updated_at": "2026-05-19 09:19"
   }
 ]
