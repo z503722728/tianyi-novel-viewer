@@ -68,6 +68,64 @@ def make_book_id(world_name: str) -> str:
     safe = re.sub(r'[^\w\u4e00-\u9fff-]', '_', world_name).strip('_')
     return safe or 'novel'
 
+def _parse_md_card(filename: str, content: str) -> dict | None:
+    """解析 references/characters/char_XXX_名字.md 格式角色卡"""
+    import re as _re
+    lines = content.strip().split('\n')
+    if not lines:
+        return None
+
+    # 从第一行提取名字: "# 名字 — 描述"
+    title_line = lines[0].lstrip('#').strip()
+    name = title_line.split('—')[0].split('-')[0].strip()
+    if not name:
+        name = filename.replace('.md', '').split('_', 2)[-1]
+
+    char = {
+        "char_id": filename.replace('.md', ''),
+        "name": name,
+        "role_type": "supporting",
+        "background": "",
+        "personality_tags": [],
+        "capabilities": [],
+    }
+
+    # 解析 key: value 和 **key:** value 格式
+    desc_parts = []
+    for line in lines[1:]:
+        line = line.strip()
+        if not line:
+            continue
+        # **key:** value 格式
+        m = _re.match(r'^\*\*(.+?)[:：]\*\*\s*(.*)', line)
+        if m:
+            key, val = m.group(1).strip(), m.group(2).strip()
+            if key in ('importance', '定位'):
+                if key == 'importance':
+                    imp_map = {'core': 'protagonist', 'major': 'supporting', 'minor': 'minor'}
+                    char['role_type'] = imp_map.get(val, val)
+                else:
+                    char['role_type'] = val
+            elif key == '性格':
+                char['personality_tags'] = [t.strip() for t in val.split('、') if t.strip()]
+            elif key == '能力':
+                # 解析 ['cap1', 'cap2'] 格式或普通文本
+                if val.startswith('['):
+                    try:
+                        char['capabilities'] = json.loads(val.replace("'", '"'))
+                    except:
+                        char['capabilities'] = [t.strip().strip("'\"") for t in val.strip('[]').split(',') if t.strip()]
+                else:
+                    char['capabilities'] = [t.strip() for t in val.split('、') if t.strip()]
+            elif key in ('背景', '加入方式', '外表'):
+                desc_parts.append(f"【{key}】{val}")
+        elif not line.startswith('#'):
+            desc_parts.append(line)
+
+    char['background'] = '\n'.join(desc_parts)
+    return char
+
+
 # ===== 读取天意项目数据 =====
 def load_novel_project(project_dir: str) -> dict:
     p = Path(project_dir)
@@ -91,19 +149,44 @@ def load_novel_project(project_dir: str) -> dict:
             result["world_name"] = result["world"].get("world_name", "未知世界")
         print(f"  ✅ 世界观: {result['world_name']}")
 
-    # ═══ 角色数据（v2.3+: 独立存 characters/ 目录，不再内嵌 world_data）═══
+    # ═══ 角色数据（v2.3+: 独立存 characters/ 目录 + references/characters/ markdown 卡片）═══
     char_dir = p / "characters"
+    ref_char_dir = p / "references" / "characters"
+    characters = []
+
+    # 1) 从 characters/*.json 加载（自动生成的角色）
     if char_dir.exists():
-        characters = []
         for cf in sorted(char_dir.glob("*.json")):
             try:
                 with open(cf, encoding='utf-8') as f:
                     characters.append(json.load(f))
             except Exception as e:
                 print(f"  ⚠️  角色加载失败 {cf.name}: {e}")
-        if characters:
-            result["world"]["characters"] = characters
+
+    # 2) 从 references/characters/*.md 加载（正式角色卡，优先级更高）
+    if ref_char_dir.exists():
+        md_chars = []
+        for mf in sorted(ref_char_dir.glob("char_*.md")):
+            try:
+                content = mf.read_text(encoding='utf-8')
+                char_data = _parse_md_card(mf.name, content)
+                if char_data:
+                    md_chars.append(char_data)
+            except Exception as e:
+                print(f"  ⚠️  Markdown角色卡加载失败 {mf.name}: {e}")
+        if md_chars:
+            # 用 markdown 卡片替换同名 JSON 角色，保留未匹配的 JSON 角色
+            md_names = {c.get('name') for c in md_chars}
+            characters = [c for c in characters if c.get('name') not in md_names]
+            characters.extend(md_chars)
+            print(f"  ✅ 角色: {len(characters)} 人（{len(md_chars)} 卡片 + {len(characters)-len(md_chars)} 自动）")
+        else:
             print(f"  ✅ 角色: {len(characters)} 人（来自 characters/）")
+    elif characters:
+        print(f"  ✅ 角色: {len(characters)} 人（来自 characters/）")
+
+    if characters and "world" in result and result["world"] is not None:
+        result["world"]["characters"] = characters
 
     # 时间轴（完整结构，不再展平，前端分类展示）
     for tl_path in [p / "history" / "timeline.json", p / "timeline.json"]:
