@@ -76,6 +76,11 @@ def load_novel_project(project_dir: str) -> dict:
         "chapters": [],
         "timeline": [],
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        # 箱庭/box 架构新字段（默认空，outline 加载后覆盖）
+        "stages": [],
+        "truth_map": [],
+        "character_statuses": [],
+        "boxes": [],
     }
 
     # 世界观
@@ -138,10 +143,40 @@ def load_novel_project(project_dir: str) -> dict:
     if outline_path.exists():
         try:
             with open(outline_path, encoding='utf-8') as f:
-                result["outline"] = json.load(f)
+                outline_raw = json.load(f)
+            result["outline"] = outline_raw
             print(f"  ✅ 大纲: {result.get('outline',{}).get('protagonist_arc','')[:60]}")
+
+            # ── 箱庭/box 架构新字段 ──
+            result["stages"]              = outline_raw.get("stages", [])
+            result["truth_map"]           = outline_raw.get("truth_map", [])
+            result["character_statuses"]  = outline_raw.get("character_statuses", [])
+            # boxes 先从 outline 取默认值，再用 plan/boxes/*.json 覆盖
+            result["boxes"]               = outline_raw.get("boxes", [])
+            if result["stages"]:
+                print(f"  ✅ stages: {len(result['stages'])} 阶段")
+            if result["truth_map"]:
+                print(f"  ✅ truth_map: {len(result['truth_map'])} 条真相")
+            if result["character_statuses"]:
+                print(f"  ✅ character_statuses: {len(result['character_statuses'])} 条状态")
         except Exception as e:
             print(f"  ⚠️  大纲读取失败: {e}")
+
+    # ═══ 箱庭盒子数据（plan/boxes/*.json，按文件名排序） ═══
+    boxes_dir = p / "plan" / "boxes"
+    if boxes_dir.exists():
+        box_files = sorted(boxes_dir.glob("*.json"))
+        if box_files:
+            boxes_list = []
+            for bf in box_files:
+                try:
+                    with open(bf, encoding='utf-8') as f:
+                        boxes_list.append(json.load(f))
+                except Exception as e:
+                    print(f"  ⚠️  盒子读取失败 {bf.name}: {e}")
+            if boxes_list:
+                result["boxes"] = boxes_list
+                print(f"  ✅ boxes: {len(boxes_list)} 个盒子（来自 plan/boxes/）")
 
     # ═══ 蓝图数据（全部章节，按章号排序） ═══
     bp_dir = p / "plan" / "blueprints"

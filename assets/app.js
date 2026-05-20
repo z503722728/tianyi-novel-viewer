@@ -135,6 +135,15 @@
         }
         return;
       }
+      if (section === 'boxes') {
+        switchNav('boxes');
+        if (param === 'truth_map') setTimeout(showTruthMap, 100);
+        if (param === 'statuses') setTimeout(showCharacterStatuses, 100);
+        if (param && param.startsWith('box_')) {
+          setTimeout(() => showBoxDetail(param), 100);
+        }
+        return;
+      }
     }
 
     function scrollToBlock(blockId) {
@@ -377,6 +386,17 @@
       }));
     }
 
+    // 4. 箱庭总览卡（如有数据）
+    const boxTotal = (d.boxes||[]).length;
+    if (boxTotal > 0 || (d.truth_map||[]).length > 0) {
+      grid.appendChild(makeCard({
+        icon: '🏠', title: '箱庭架构', badge: '箱庭', badgeClass: 'badge-box',
+        desc: `${boxTotal}个箱庭 · ${(d.truth_map||[]).length}条真相 · ${(d.character_statuses||[]).length}人状态`,
+        stats: [{ label: '阶段', value: (d.stages||[]).length }, { label: '真相', value: (d.truth_map||[]).length }],
+        onClick: () => switchNav('boxes')
+      }));
+    }
+
     buildSidebar();
   }
 
@@ -430,7 +450,7 @@
   window.showSidebar = () => { document.getElementById('sidebar').classList.remove('hidden'); document.getElementById('overlay').classList.remove('hidden'); };
   window.hideSidebar = () => { document.getElementById('sidebar').classList.add('hidden'); document.getElementById('overlay').classList.add('hidden'); };
 
-  // ===== 底部导航（5个tab：首页/章节/设定/历史/角色）=====
+  // ===== 底部导航（7个tab：首页/章节/设定/角色/历史/蓝图/箱庭）=====
   window.switchNav = (tab) => {
     if (!currentBook) return;
     currentTab = tab; updateNavActive(tab);
@@ -441,6 +461,7 @@
     if (tab === 'characters') return renderCharList();
     if (tab === 'timeline')   return renderHistoryHub();
     if (tab === 'plan')       return renderPlanHub();
+    if (tab === 'boxes')      return renderBoxesHub();
   };
   function updateNavActive(tab) {
     document.querySelectorAll('.nav-item').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
@@ -463,7 +484,7 @@
     destroyLazyList();
     if (backTarget === 'bookshelf') { enterBookshelf(); return; }
     // 返回对应 tab 的列表
-    const tabMap = { world: 'world', characters: 'characters', timeline: 'timeline', chapters: 'chapters', plan: 'plan' };
+    const tabMap = { world: 'world', characters: 'characters', timeline: 'timeline', chapters: 'chapters', plan: 'plan', boxes: 'boxes' };
     if (tabMap[currentTab]) { showView('home-view'); switchNav(currentTab); }
     else { showView('home-view'); document.getElementById('current-title').textContent = currentBook?.world_name || '天意'; }
   };
@@ -492,11 +513,13 @@
     _lazyList = new LazyList({ container: wrap, items: chs, renderItem: ch => makeChapterCard(ch), batch: 20, maxDom: 60 });
   }
   function makeChapterCard(ch) {
+    const typeIconMap = ch.chapter_type?.includes('dark') ? '⚡' : ch.chapter_type === 'box_entry' ? '🚪' : ch.chapter_type === 'box_discussion' ? '💬' : ch.chapter_type === 'box_twist' ? '🌀' : '📖';
+    const typeBadgeMap = ch.chapter_type === 'dark_line_a' ? '暗线A' : ch.chapter_type === 'dark_line_b' ? '暗线B' : ch.chapter_type === 'box_entry' ? '箱庭·入场' : ch.chapter_type === 'box_discussion' ? '箱庭·讨论' : ch.chapter_type === 'box_twist' ? '箱庭·反转' : '正线';
     return makeCard({
-      icon: ch.chapter_type?.includes('dark') ? '⚡' : '📖',
+      icon: typeIconMap,
       title: ch.title || `第${ch.chapter_num}章`,
-      badge: ch.chapter_type === 'dark_line_a' ? '暗线A' : ch.chapter_type === 'dark_line_b' ? '暗线B' : '正线',
-      badgeClass: 'badge-chapter',
+      badge: typeBadgeMap,
+      badgeClass: ch.chapter_type?.startsWith('box_') ? 'badge-box' : 'badge-chapter',
       desc: ch.summary || '',
       stats: [{ label: '字数', value: fmtNum(ch.word_count||0) }, { label: '视角', value: ch.pov_character||'主角' }],
       onClick: () => showChapterDetail(ch)
@@ -517,7 +540,7 @@
     const headerHtml = `
       <h1 style="font-size:20px;font-weight:700;margin:0 0 12px;color:#fff">${escHtml(ch.title||'章节')}</h1>
       <div class="meta-row" style="margin-bottom:12px">
-        <span class="tag">${ch.chapter_type==='dark_line_a'?'⚡ 暗线A':ch.chapter_type==='dark_line_b'?'⚡ 暗线B':'🎬 正线'}</span>
+        <span class="tag">${ch.chapter_type==='dark_line_a'?'⚡ 暗线A':ch.chapter_type==='dark_line_b'?'⚡ 暗线B':ch.chapter_type==='box_entry'?'🚪 箱庭·入场':ch.chapter_type==='box_discussion'?'💬 箱庭·讨论':ch.chapter_type==='box_twist'?'🌀 箱庭·反转':'🎬 正线'}</span>
         <span class="tag">👁 ${escHtml(ch.pov_character||'主角')}</span>
         ${ch.word_count?`<span class="tag">${fmtNum(ch.word_count)} 字</span>`:''}
         ${ch.location?`<span class="tag">📍 ${escHtml(ch.location)}</span>`:''}
@@ -820,7 +843,7 @@
       <h1>章节蓝图</h1>
       ${sorted.map(bp => {
         const styles = (bp.styles||[]).map(s => styleIcon[s]||'📌').join(' ');
-        const chType = {'main_pov':'主角明线','dark_line_a':'⚡暗线A','dark_line_b':'⚡暗线B','character_interlude':'配角插曲','side_arc':'支线'}[bp.chapter_type]||bp.chapter_type;
+        const chType = {'main_pov':'主角明线','dark_line_a':'⚡暗线A','dark_line_b':'⚡暗线B','character_interlude':'配角插曲','side_arc':'支线','box_entry':'🚪箱庭·入场','box_discussion':'💬箱庭·讨论','box_twist':'🌀箱庭·反转'}[bp.chapter_type]||bp.chapter_type;
         return `<div class="info-card" onclick="showBlueprintDetail('${escHtml(bp.chapter_id)}')" style="cursor:pointer">
           <div class="info-card-title">第${bp.chapter_number}章 ${escHtml(bp.title||'')} ${styles}</div>
           <div class="meta-row">
@@ -866,6 +889,16 @@
       ${bp.reaction_roles?.length ? `<h2>旁观脑补位</h2><p>${bp.reaction_roles.map(escHtml).join('；')}</p>` : ''}
       ${bp.relationship_targets?.length ? `<h2>关系变化目标</h2>${bp.relationship_targets.map(r=>`<div class="info-card" style="border-color:var(--accent)"><div class="fact-row"><span class="fact-label">${escHtml(r.character_a)}→${escHtml(r.character_b)}</span><span class="fact-val">${escHtml(r.direction)}</span></div>${(r.behavioral_indicators||[]).length?`<div>行为指标：${r.behavioral_indicators.map(escHtml).join('；')}</div>`:''}</div>`).join('')}` : ''}
       ${bp.information_wrapper?`<h2>信息量包裹</h2><p>${escHtml(bp.information_wrapper)}</p>`:''}
+      ${(bp.story_direction||bp.information_points||bp.prose_direction||bp.plot_function||bp.core_interaction||bp.dialogue_ratio)?`
+        <div class="separator"></div>
+        <h2>进阶设计 (v4/v5)</h2>
+        ${bp.story_direction?`<div class="fact-row"><span class="fact-label">故事走向</span><span class="fact-val">${escHtml(bp.story_direction)}</span></div>`:''}
+        ${bp.information_points?`<div class="fact-row"><span class="fact-label">信息要点</span><span class="fact-val">${escHtml(bp.information_points)}</span></div>`:''}
+        ${bp.prose_direction?`<div class="fact-row"><span class="fact-label">散文方向</span><span class="fact-val">${escHtml(bp.prose_direction)}</span></div>`:''}
+        ${bp.plot_function?`<div class="fact-row"><span class="fact-label">剧情功能</span><span class="fact-val">${escHtml(bp.plot_function)}</span></div>`:''}
+        ${bp.core_interaction?`<div class="fact-row"><span class="fact-label">核心交互</span><span class="fact-val">${escHtml(bp.core_interaction)}</span></div>`:''}
+        ${bp.dialogue_ratio?`<div class="fact-row"><span class="fact-label">对话占比</span><span class="fact-val">${escHtml(bp.dialogue_ratio)}</span></div>`:''}
+      `:''}
     `, `第${bp.chapter_number}章 蓝图`, 'plan');
   };
 
@@ -888,6 +921,308 @@
         </div>
       `).join('')}
     `, '写作风格', 'plan');
+  }
+
+  // ===== 箱庭/Box 中心 =====
+  function renderBoxesHub() {
+    const d = currentBook; if (!d) return;
+    const grid = document.getElementById('card-grid');
+    grid.innerHTML = `<div class="update-time">箱庭架构</div>`;
+    const items = [];
+
+    const boxes = d.boxes || [];
+    if (boxes.length) {
+      items.push(makeCard({
+        icon: '🏠', title: '箱庭列表', badge: `${boxes.length}个箱庭`,
+        badgeClass: 'badge-box', desc: '各箱庭的规则、参与者与脚本',
+        onClick: () => showBoxList()
+      }));
+    }
+
+    const truthMap = d.truth_map || [];
+    if (truthMap.length) {
+      items.push(makeCard({
+        icon: '🗺', title: '真相地图', badge: `${truthMap.length}条信息`,
+        badgeClass: 'badge-box', desc: '信息的锁定/解锁状态与阶段分布',
+        onClick: () => showTruthMap()
+      }));
+    }
+
+    const statuses = d.character_statuses || [];
+    if (statuses.length) {
+      const alive = statuses.filter(s => s.status === 'alive').length;
+      const dormant = statuses.filter(s => s.status === 'dormant').length;
+      const dead = statuses.filter(s => s.status === 'dead').length;
+      items.push(makeCard({
+        icon: '🩺', title: '角色状态', badge: `${statuses.length}人`,
+        badgeClass: 'badge-char',
+        desc: `🟢 活跃 ${alive} · 🟡 休眠 ${dormant} · 🔴 已故 ${dead}`,
+        onClick: () => showCharacterStatuses()
+      }));
+    }
+
+    const stages = d.stages || [];
+    if (stages.length) {
+      items.push(makeCard({
+        icon: '🎭', title: '箱庭阶段', badge: `${stages.length}个阶段`,
+        badgeClass: 'badge-stage', desc: '各阶段的目标、规则与解锁条件',
+        onClick: () => showStages()
+      }));
+    }
+
+    if (!items.length) {
+      grid.innerHTML += '<p style="padding:16px;color:var(--text-dim)">暂无箱庭数据</p>';
+      return;
+    }
+    items.forEach(el => grid.appendChild(el));
+  }
+
+  function showBoxList() {
+    if (currentBook?.book_id) Router.set(currentBook.book_id, 'boxes');
+    const boxes = currentBook?.boxes || [];
+    if (!boxes.length) {
+      showDetail('<p style="color:var(--text2)">暂无箱庭数据</p>', '箱庭列表', 'boxes');
+      return;
+    }
+    const html = `
+      <h1>箱庭列表</h1>
+      ${boxes.map(box => {
+        const rules = box.rules || [];
+        const participants = box.participants || [];
+        const scripts = box.scripts || [];
+        return `
+          <div class="box-card" id="box-${escHtml(box.box_id||'')}">
+            <div class="box-card-header" onclick="this.parentElement.classList.toggle('expanded')">
+              <span style="font-size:20px">🏠</span>
+              <div style="flex:1">
+                <div style="font-weight:600;color:var(--text)">${escHtml(box.name||box.box_id||'箱庭')}</div>
+                ${box.theme?`<div style="font-size:12px;color:var(--text3);margin-top:2px">${escHtml(box.theme)}</div>`:''}
+              </div>
+              <div class="meta-row" style="margin:0;gap:4px">
+                ${rules.length?`<span class="tag badge-box">${rules.length}条规则</span>`:''}
+                ${participants.length?`<span class="tag badge-char">${participants.length}人</span>`:''}
+                ${scripts.length?`<span class="tag badge-stage">${scripts.length}个脚本</span>`:''}
+              </div>
+              <span class="box-card-arrow">›</span>
+            </div>
+            <div class="box-card-body">
+              <div class="box-card-inner">
+                ${box.description?`<p class="no-indent" style="font-size:14px;margin-bottom:12px">${escHtml(box.description)}</p>`:''}
+                ${rules.length?`
+                  <h3 style="font-size:14px;color:var(--accent2);margin-bottom:8px">📜 规则</h3>
+                  ${rules.map(r => typeof r === 'string'
+                    ? `<div class="fact-row"><span class="fact-val">• ${escHtml(r)}</span></div>`
+                    : `<div class="fact-row"><span class="fact-label">${escHtml(r.name||'规则')}</span><span class="fact-val">${escHtml(r.description||r.condition||'')}</span></div>`
+                  ).join('')}
+                `:''}
+                ${participants.length?`
+                  <h3 style="font-size:14px;color:var(--accent2);margin:12px 0 8px">👥 参与者</h3>
+                  <div class="meta-row">${participants.map(p => {
+                    const name = typeof p === 'string' ? p : (p.name||p.character_id||'?');
+                    const role = typeof p === 'object' ? p.role : '';
+                    return `<span class="tag">${escHtml(role?`${escHtml(name)} (${escHtml(role)})`:name)}</span>`;
+                  }).join('')}</div>
+                `:''}
+                ${scripts.length?`
+                  <h3 style="font-size:14px;color:var(--accent2);margin:12px 0 8px">🎬 脚本</h3>
+                  ${scripts.map(s => typeof s === 'string'
+                    ? `<div class="fact-row"><span class="fact-val">• ${escHtml(s)}</span></div>`
+                    : `<div class="info-card" style="margin-bottom:6px">
+                        <div style="font-weight:600;font-size:13px;color:var(--accent2)">${escHtml(s.name||s.script_id||'脚本')}</div>
+                        ${s.description?`<p class="no-indent" style="font-size:13px;margin-top:4px">${escHtml(s.description)}</p>`:''}
+                        ${s.trigger?`<div class="fact-row"><span class="fact-label">触发</span><span class="fact-val">${escHtml(s.trigger)}</span></div>`:''}
+                      </div>`
+                  ).join('')}
+                `:''}
+                ${box.unlock_condition?`<div class="fact-row" style="margin-top:8px"><span class="fact-label">解锁条件</span><span class="fact-val">${escHtml(box.unlock_condition)}</span></div>`:''}
+              </div>
+            </div>
+          </div>`;
+      }).join('')}
+    `;
+    showDetail(html, '箱庭列表', 'boxes');
+  }
+
+  window.showBoxDetail = (boxId) => {
+    if (!boxId) return;
+    const box = (currentBook?.boxes||[]).find(b => b.box_id === boxId);
+    if (!box) return showToast('箱庭未找到');
+    if (currentBook?.book_id) Router.set(currentBook.book_id, 'boxes', 'box_' + boxId);
+    const rules = box.rules || [];
+    const participants = box.participants || [];
+    const scripts = box.scripts || [];
+    showDetail(`
+      <h1>🏠 ${escHtml(box.name||box.box_id)}</h1>
+      ${box.theme?`<div class="meta-row"><span class="tag badge-box">${escHtml(box.theme)}</span></div>`:''}
+      ${box.description?`<p class="no-indent">${escHtml(box.description)}</p>`:''}
+      ${rules.length?`
+        <h2>📜 规则 (${rules.length})</h2>
+        ${rules.map(r => typeof r === 'string'
+          ? `<div class="info-card"><p class="no-indent">• ${escHtml(r)}</p></div>`
+          : `<div class="info-card">
+              <div class="info-card-title">${escHtml(r.name||r.rule_id||'')}</div>
+              <p class="no-indent">${escHtml(r.description||'')}</p>
+              ${r.is_hard_constraint?'<span class="tag" style="color:var(--red);border-color:var(--red)">⚠ 硬性约束</span>':''}
+            </div>`
+        ).join('')}
+      `:''}
+      ${participants.length?`
+        <h2>👥 参与者 (${participants.length})</h2>
+        <div class="meta-row">${participants.map(p => {
+          const name = typeof p === 'string' ? p : (p.name||p.character_id||'?');
+          const role = typeof p === 'object' ? p.role : '';
+          return `<span class="tag">${escHtml(role?`${name} (${role})`:name)}</span>`;
+        }).join('')}</div>
+      `:''}
+      ${scripts.length?`
+        <h2>🎬 脚本 (${scripts.length})</h2>
+        ${scripts.map(s => typeof s === 'string'
+          ? `<div class="info-card"><p class="no-indent">• ${escHtml(s)}</p></div>`
+          : `<div class="info-card">
+              <div class="info-card-title">${escHtml(s.name||s.script_id||'脚本')}</div>
+              ${s.description?`<p class="no-indent">${escHtml(s.description)}</p>`:''}
+              ${s.trigger?`<div class="fact-row"><span class="fact-label">触发条件</span><span class="fact-val">${escHtml(s.trigger)}</span></div>`:''}
+              ${s.outcome?`<div class="fact-row"><span class="fact-label">预期结果</span><span class="fact-val">${escHtml(s.outcome)}</span></div>`:''}
+            </div>`
+        ).join('')}
+      `:''}
+      ${box.unlock_condition?`<h2>🔐 解锁条件</h2><p class="no-indent">${escHtml(box.unlock_condition)}</p>`:''}
+      ${box.success_condition?`<h2>✅ 成功条件</h2><p class="no-indent">${escHtml(box.success_condition)}</p>`:''}
+      ${box.failure_condition?`<h2>❌ 失败条件</h2><p class="no-indent">${escHtml(box.failure_condition)}</p>`:''}
+    `, box.name || '箱庭详情', 'boxes');
+  };
+
+  function showTruthMap() {
+    if (currentBook?.book_id) Router.set(currentBook.book_id, 'boxes', 'truth_map');
+    const truthMap = currentBook?.truth_map || [];
+    const stages = currentBook?.stages || [];
+    const stageNames = stages.map(s => s.name || s.stage_id).filter(Boolean);
+
+    const grid = document.getElementById('card-grid');
+    grid.innerHTML = `<div class="update-time">真相地图 · ${truthMap.length} 条信息</div>`;
+
+    // Stage filter bar
+    const filterBar = document.createElement('div');
+    filterBar.className = 'filter-bar';
+    filterBar.style.padding = '8px 16px 0';
+    const filterBtnAll = document.createElement('button');
+    filterBtnAll.className = 'filter-btn active';
+    filterBtnAll.textContent = '全部';
+    filterBtnAll.onclick = () => filterTruthMap(null);
+    filterBar.appendChild(filterBtnAll);
+    stageNames.forEach(stage => {
+      const btn = document.createElement('button');
+      btn.className = 'filter-btn';
+      btn.textContent = stage;
+      btn.dataset.stage = stage;
+      btn.onclick = () => filterTruthMap(stage);
+      filterBar.appendChild(btn);
+    });
+    grid.appendChild(filterBar);
+
+    // Truth items container
+    const wrap = document.createElement('div');
+    wrap.style.padding = '0 16px';
+    wrap.id = 'truth-map-list';
+    grid.appendChild(wrap);
+
+    function renderTruthItems(filter) {
+      wrap.innerHTML = '';
+      const items = filter ? truthMap.filter(t => t.stage === filter) : truthMap;
+      if (!items.length) {
+        wrap.innerHTML = '<p style="color:var(--text3);text-align:center;padding:24px">无匹配信息</p>';
+        return;
+      }
+      items.forEach(t => {
+        const lockState = t.is_revealed === true ? 'unlocked' : t.is_revealed === false ? 'locked' : 'pending';
+        const lockLabel = lockState === 'unlocked' ? '🔓 已揭示' : lockState === 'locked' ? '🔒 未揭示' : '⏳ 待定';
+        const el = document.createElement('div');
+        el.className = 'info-card';
+        el.innerHTML = `
+          <div style="display:flex;align-items:flex-start;gap:10px">
+            <div class="truth-dot ${lockState}" style="margin-top:4px"></div>
+            <div style="flex:1">
+              <div style="font-weight:600;color:var(--text);font-size:14px">${escHtml(t.title||t.information_id||'真相')}</div>
+              ${t.description?`<p class="no-indent" style="font-size:13px;margin-top:4px">${escHtml(t.description)}</p>`:''}
+              <div class="meta-row" style="margin-top:6px">
+                ${t.stage?`<span class="tag badge-stage">${escHtml(t.stage)}</span>`:''}
+                <span class="lock-badge ${lockState}">${lockLabel}</span>
+                ${t.holder?`<span class="tag">持有: ${escHtml(t.holder)}</span>`:''}
+                ${t.reveal_chapter?`<span class="tag">揭示: 第${t.reveal_chapter}章</span>`:''}
+              </div>
+            </div>
+          </div>`;
+        wrap.appendChild(el);
+      });
+    }
+
+    window.filterTruthMap = (stage) => {
+      filterBar.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', stage ? b.dataset.stage === stage : !b.dataset.stage));
+      renderTruthItems(stage);
+    };
+
+    renderTruthItems(null);
+  }
+
+  function showCharacterStatuses() {
+    if (currentBook?.book_id) Router.set(currentBook.book_id, 'boxes', 'statuses');
+    const statuses = currentBook?.character_statuses || [];
+    if (!statuses.length) {
+      showDetail('<p style="color:var(--text2)">暂无角色状态数据</p>', '角色状态', 'boxes');
+      return;
+    }
+    // Group by status
+    const grouped = { alive: [], dormant: [], dead: [], unknown: [] };
+    statuses.forEach(s => {
+      const st = s.status || 'unknown';
+      if (grouped[st]) grouped[st].push(s);
+      else grouped.unknown.push(s);
+    });
+    const statusMeta = {
+      alive:   { icon: '🟢', label: '活跃', cssClass: 'status-alive' },
+      dormant: { icon: '🟡', label: '休眠', cssClass: 'status-dormant' },
+      dead:    { icon: '🔴', label: '已故', cssClass: 'status-dead' },
+      unknown: { icon: '⚪', label: '未知', cssClass: '' },
+    };
+    let html = '<h1>角色状态</h1>';
+    for (const [status, list] of Object.entries(grouped)) {
+      if (!list.length) continue;
+      const meta = statusMeta[status];
+      html += `<h2>${meta.icon} ${meta.label} (${list.length})</h2>`;
+      html += list.map(s => `
+        <div class="info-card">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="tag ${meta.cssClass}" style="font-size:11px">${meta.label}</span>
+            <span style="font-weight:600;color:var(--text)">${escHtml(s.name||s.character_id||'?')}</span>
+          </div>
+          ${s.reason?`<p class="no-indent" style="font-size:13px;margin-top:6px">${escHtml(s.reason)}</p>`:''}
+          ${s.since_chapter?`<div class="fact-row"><span class="fact-label">起始章节</span><span class="fact-val">第${s.since_chapter}章</span></div>`:''}
+          ${s.location?`<div class="fact-row"><span class="fact-label">当前位置</span><span class="fact-val">${escHtml(s.location)}</span></div>`:''}
+        </div>
+      `).join('');
+    }
+    showDetail(html, '角色状态', 'boxes');
+  }
+
+  function showStages() {
+    const stages = currentBook?.stages || [];
+    if (!stages.length) {
+      showDetail('<p style="color:var(--text2)">暂无阶段数据</p>', '箱庭阶段', 'boxes');
+      return;
+    }
+    showDetail(`
+      <h1>箱庭阶段</h1>
+      ${stages.map(s => `
+        <div class="info-card">
+          <div class="info-card-title">🎭 ${escHtml(s.name||s.stage_id||'阶段')}</div>
+          ${s.chapter_range?`<div class="meta-row"><span class="tag badge-stage">第${s.chapter_range[0]}~${s.chapter_range[1]}章</span></div>`:''}
+          ${s.description?`<p class="no-indent">${escHtml(s.description)}</p>`:''}
+          ${s.goal?`<div class="fact-row"><span class="fact-label">目标</span><span class="fact-val">${escHtml(s.goal)}</span></div>`:''}
+          ${s.rules?`<div class="fact-row"><span class="fact-label">规则</span><span class="fact-val">${escHtml(typeof s.rules === 'string' ? s.rules : (s.rules||[]).join('；'))}</span></div>`:''}
+          ${s.unlock_condition?`<div class="fact-row"><span class="fact-label">解锁条件</span><span class="fact-val">${escHtml(s.unlock_condition)}</span></div>`:''}
+        </div>
+      `).join('')}
+    `, '箱庭阶段', 'boxes');
   }
 
   // ===== 角色列表（LazyList）=====

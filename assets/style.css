@@ -466,3 +466,74 @@ html, body {
   margin: 8px 0;
 }
 
+/* ===== 箱庭/Box 样式 ===== */
+.badge-box { background: rgba(236,72,153,0.2); color: #ec4899; }
+.badge-stage { background: rgba(59,130,246,0.2); color: #60a5fa; }
+
+.status-alive   { background: rgba(16,185,129,0.2); color: #34d399; border-color: rgba(16,185,129,0.3); }
+.status-dormant { background: rgba(245,158,11,0.2); color: #fbbf24; border-color: rgba(245,158,11,0.3); }
+.status-dead    { background: rgba(239,68,68,0.2); color: #f87171; border-color: rgba(239,68,68,0.3); }
+
+.box-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.box-card-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px; cursor: pointer;
+  transition: background 0.2s;
+}
+.box-card-header:active { background: rgba(255,255,255,0.03); }
+.box-card-arrow {
+  margin-left: auto; font-size: 12px; color: var(--text3);
+  transition: transform 0.25s;
+}
+.box-card.expanded .box-card-arrow { transform: rotate(90deg); }
+.box-card-body {
+  max-height: 0; overflow: hidden;
+  transition: max-height 0.3s ease;
+  border-top: 0 solid var(--border);
+}
+.box-card.expanded .box-card-body {
+  max-height: 800px;
+  border-top-width: 1px;
+}
+.box-card-inner { padding: 14px 16px; }
+
+.truth-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.truth-item:last-child { border-bottom: none; }
+.truth-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 6px;
+}
+.truth-dot.locked { background: var(--red); }
+.truth-dot.unlocked { background: var(--green); }
+.truth-dot.pending { background: var(--gold); }
+
+.lock-badge {
+  display: inline-block; font-size: 11px; padding: 1px 8px;
+  border-radius: 99px; font-weight: 500; margin-left: 6px;
+}
+.lock-badge.locked   { background: rgba(239,68,68,0.15); color: #f87171; }
+.lock-badge.unlocked { background: rgba(16,185,129,0.15); color: #34d399; }
+
+.filter-bar {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 8px 0 14px;
+}
+.filter-btn {
+  font-size: 12px; padding: 4px 12px;
+  border-radius: 99px; border: 1px solid var(--border);
+  background: transparent; color: var(--text2);
+  cursor: pointer; transition: all 0.2s;
+}
+.filter-btn.active {
+  background: rgba(124,92,252,0.2); color: var(--accent2);
+  border-color: var(--accent);
+}
+
